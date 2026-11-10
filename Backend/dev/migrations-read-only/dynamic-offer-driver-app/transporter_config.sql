@@ -1336,3 +1336,9 @@ ALTER TABLE atlas_driver_offer_bpp.transporter_config ADD COLUMN calling_mode te
 ------- SQL updates -------
 
 ALTER TABLE atlas_driver_offer_bpp.transporter_config ADD COLUMN customer_payable_fare_breakup_sub_items_config json ;
+
+
+------- SQL updates -------
+
+ALTER TABLE atlas_driver_offer_bpp.transporter_config ADD COLUMN takeover_scoring json ;
+ALTER TABLE atlas_driver_offer_bpp.transporter_config ADD COLUMN require_rc_takeover_photo boolean ;

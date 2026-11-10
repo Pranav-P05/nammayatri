@@ -823,6 +823,7 @@ library
       SharedLogic.PersonDefaultEmergencyNumber
       SharedLogic.Pricing
       SharedLogic.QuickRetry
+      SharedLogic.RCTakeoverVerification
       SharedLogic.RCTransferNotice
       SharedLogic.Reminder.Helper
       SharedLogic.RenderInvoiceFromTemplate
@@ -1250,6 +1251,7 @@ library
       Tools.Event
       Tools.EventTracking
       Tools.FieldParse
+      Tools.Grid
       Tools.Maps
       Tools.MarketingEvents
       Tools.Metrics
