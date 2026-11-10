@@ -90,7 +90,8 @@ postEditResult (mbPersonId, _, _) bookingUpdateReqId EditBookingRespondAPIReq {.
           whenJust multipleRoutes $ \allRoutes -> do
             Redis.setExp (multipleRouteKey booking.transactionId) allRoutes 3600
           let estimatedDistance = highPrecMetersToMeters <$> bookingUpdateReq.estimatedDistance
-          QB.updateMultipleById bookingUpdateReq.estimatedFare bookingUpdateReq.maxEstimatedDistance estimatedDistance bookingUpdateReq.estimatedDuration bookingUpdateReq.estimatedStaticDuration bookingUpdateReq.fareParamsId.getId bookingUpdateReq.bookingId
+          QB.updateMultipleById (bookingUpdateReq.estimatedFare, bookingUpdateReq.estimatedFareSettlement) bookingUpdateReq.maxEstimatedDistance estimatedDistance bookingUpdateReq.estimatedDuration bookingUpdateReq.estimatedStaticDuration bookingUpdateReq.fareParamsId.getId bookingUpdateReq.bookingId
+          applyUpdateRequestBookingFare booking bookingUpdateReq
           promoteEditFarePolicyToQuote booking bookingUpdateReq
           recomputeRideFinancialsForFareUpdate booking ride bookingUpdateReq
           updatedBooking <- QB.findById bookingUpdateReq.bookingId >>= fromMaybeM (BookingDoesNotExist bookingUpdateReq.bookingId.getId)
@@ -141,7 +142,8 @@ postEditResultNoRide booking bookingUpdateReq dropLocation = do
     searchReq <- QSRLite.findByTransactionIdAndMerchantIdLite booking.transactionId booking.providerId >>= fromMaybeM (SearchRequestNotFound $ "transactionId-" <> booking.transactionId <> ",merchantId-" <> booking.providerId.getId)
     QSR.updateIsReallocationEnabled (Just False) searchReq.id
   let estimatedDistance = highPrecMetersToMeters <$> bookingUpdateReq.estimatedDistance
-  QB.updateMultipleById bookingUpdateReq.estimatedFare bookingUpdateReq.maxEstimatedDistance estimatedDistance bookingUpdateReq.estimatedDuration bookingUpdateReq.estimatedStaticDuration bookingUpdateReq.fareParamsId.getId bookingUpdateReq.bookingId
+  QB.updateMultipleById (bookingUpdateReq.estimatedFare, bookingUpdateReq.estimatedFareSettlement) bookingUpdateReq.maxEstimatedDistance estimatedDistance bookingUpdateReq.estimatedDuration bookingUpdateReq.estimatedStaticDuration bookingUpdateReq.fareParamsId.getId bookingUpdateReq.bookingId
+  applyUpdateRequestBookingFare booking bookingUpdateReq
   promoteEditFarePolicyToQuote booking bookingUpdateReq
   updatedBooking <- QB.findById bookingUpdateReq.bookingId >>= fromMaybeM (BookingDoesNotExist bookingUpdateReq.bookingId.getId)
   CallBAP.sendUpdateEditDestToBAP updatedBooking Nothing bookingUpdateReq (Just dropLocation) Nothing OU.CONFIRM_UPDATE

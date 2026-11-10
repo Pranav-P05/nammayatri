@@ -91,6 +91,7 @@ import SharedLogic.JobScheduler
 import qualified SharedLogic.LocationMapping as SLM
 import SharedLogic.Payment as SPayment
 import qualified SharedLogic.Person as SLP
+import qualified SharedLogic.RiderFareSettlement as SRFS
 import qualified SharedLogic.SilentReallocation as SilentRealloc
 import qualified Storage.CachedQueries.Merchant as QCM
 import qualified Storage.CachedQueries.Merchant.MerchantPushNotification as CPN
@@ -445,6 +446,7 @@ data ChangeServiceTierReq = ChangeServiceTierReq
     newVehicleServiceTier :: Domain.Types.ServiceTierType.ServiceTierType,
     newEstimatedFare :: Maybe HighPrecMoney,
     newQuoteId :: Maybe Text,
+    fareBreakups :: [Common.DFareBreakup],
     transactionId :: Text
   }
 
@@ -452,7 +454,8 @@ data ValidatedChangeServiceTierReq = ValidatedChangeServiceTierReq
   { booking :: DRB.Booking,
     newVehicleServiceTier :: Domain.Types.ServiceTierType.ServiceTierType,
     newEstimatedFare :: Maybe HighPrecMoney,
-    newQuoteId :: Maybe Text
+    newQuoteId :: Maybe Text,
+    fareBreakups :: [Common.DFareBreakup]
   }
 
 data AddBaggageReq = AddBaggageReq
@@ -657,6 +660,7 @@ onUpdate = \case
     SFareBreakupInfo.setFareBreakupInfoFromFareBreakups (Just booking.merchantId) (Just booking.merchantOperatingCityId) fareBreakups
     estimatedFare <- bookingUpdateRequest.estimatedFare & fromMaybeM (InternalError "Estimated fare not found for bookingUpdateRequestId")
     QRB.updateMultipleById True estimatedFare estimatedFare (convertHighPrecMetersToDistance bookingUpdateRequest.distanceUnit <$> bookingUpdateRequest.estimatedDistance) bookingUpdateRequest.bookingId
+    QRB.updateFareSettlement bookingUpdateRequest.bookingId (Just (SRFS.bookingSettlementWithTotal booking (mkPrice (Just booking.estimatedFare.currency) estimatedFare)))
     whenJust ride $ \_ride -> do
       mbJourneyLeg <- QJourneyLeg.findByLegSearchId (Just booking.transactionId)
       whenJust mbJourneyLeg $ \journeyLeg -> do
@@ -728,12 +732,18 @@ onUpdate = \case
         mbLuggageCapacity = mbNewQuote >>= (.vehicleServiceTierLuggageCapacity)
     -- Single DB update with all changed fields after BPP confirms
     QEBooking.updateServiceTierOnChange booking.id newVehicleServiceTier newEstimatedFare mbBapQuoteId mbServiceTierName mbServiceTierShortDesc mbIsAirConditioned mbVehicleServiceTierAC mbSeatingCapacity mbLuggageCapacity
+    whenJust newEstimatedFare $ \fare ->
+      QRB.updateFareSettlement booking.id (Just (SRFS.bookingSettlementWithTotal booking (mkPrice (Just booking.estimatedFare.currency) fare)))
+    unless (null fareBreakups) $ do
+      newBreakups <- traverse (Common.buildFareBreakupV2 booking.id.getId DFareBreakup.BOOKING) fareBreakups
+      SFareBreakupInfo.setFareBreakupInfoFromFareBreakups (Just booking.merchantId) (Just booking.merchantOperatingCityId) newBreakups
     let newServiceTierName = fromMaybe (show newVehicleServiceTier) mbServiceTierName
     Notify.notifyOnServiceTierChange booking newServiceTierName
   OUValidatedAddBaggageReq ValidatedAddBaggageReq {..} -> do
     logInfo $ "Add baggage confirmed for booking: " <> booking.id.getId <> " to count: " <> show numberOfLuggages <> ", newFare: " <> show newEstimatedFare
-    whenJust newEstimatedFare $ \fare ->
+    whenJust newEstimatedFare $ \fare -> do
       QEBooking.updateEstimatedFare booking.id fare
+      QRB.updateFareSettlement booking.id (Just (SRFS.bookingSettlementWithTotal booking (mkPrice (Just booking.estimatedFare.currency) fare)))
     -- Replace BOOKING-scoped FareBreakup rows with the recalculated breakdown from BPP.
     unless (null fareBreakups) $ do
       newBreakups <- traverse (Common.buildFareBreakupV2 booking.id.getId DFareBreakup.BOOKING) fareBreakups

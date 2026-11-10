@@ -24,6 +24,7 @@ module SharedLogic.BetterDriverSwap
   )
 where
 
+import Control.Applicative ((<|>))
 import qualified Domain.Action.Beckn.Init as DInit
 import qualified Domain.Action.UI.Ride.Common as RideCommon
 import qualified Domain.Types.Booking as DRB
@@ -53,6 +54,7 @@ import SharedLogic.QuickRetry (withQuickRetry)
 import SharedLogic.Ride (deactivateExistingQuotes, initializeRide)
 import qualified Storage.Queries.Booking as QRB
 import qualified Storage.Queries.BookingCancellationReason as QBCR
+import qualified Storage.Queries.FareParameters as QFP
 import qualified Storage.Queries.FleetDriverAssociation as QFDA
 import qualified Storage.Queries.Ride as QRide
 import qualified Storage.Queries.RiderDetails as QRD
@@ -96,15 +98,18 @@ betterDriverSwapAssign BetterDriverSwapReq {..} = do
               isInsured = Nothing,
               insuredAmount = Nothing,
               displayBookingId = Nothing,
-              discountAmount = Nothing,
+              discountAmount = oldBooking.discountAmount <|> searchTry.discountAmount,
               initialStatus = DRB.TRIP_ASSIGNED,
               riderId = searchReq.riderId,
-              riderName = searchReq.riderName
+              riderName = searchReq.riderName,
+              paymentChargeDetails = oldBooking.paymentChargeDetails,
+              platformDeductions = oldBooking.estimatedFareSettlement >>= (.deductedAtPayment)
             }
     mbRiderConsent <- maybe (pure Nothing) (fmap (>>= (.consentToShareMobileNumber)) . QRD.findById) searchReq.riderId
     booking <- (\b -> b {DRB.numberShareConsent = mbRiderConsent}) <$> DInit.buildBooking bArgs searchReq driverQuote searchTry.billingCategory driverQuote.id.getId driverQuote.tripCategory now Nothing Nothing (Just driverQuote.distanceToPickup) Nothing searchReq.configInExperimentVersions driverQuote.coinsRewardedOnGoldTierRide driverQuote.preferenceMatchScore (Just driverQuote.searchTryId) (Just driverQuote.durationToPickup) searchTry.emailDomain searchTry.businessEmailDomain driverQuote.isAutoAccepted searchTry.addOnData
     triggerBookingCreatedEvent BookingEventData {booking = booking, personId = driverQuote.driverId, merchantId = merchant.id}
     QRB.createBooking booking
+    QFP.updatePaymentCharge driverQuote.fareParams booking.fareParams
     cityLabel <- SML.getCityLabel booking.merchantOperatingCityId
     metricsDistanceBucketEdges <- SML.getDistanceBucketEdges booking.merchantOperatingCityId
     let (pickupZone, dropZone) = SML.specialZoneLabels booking.area

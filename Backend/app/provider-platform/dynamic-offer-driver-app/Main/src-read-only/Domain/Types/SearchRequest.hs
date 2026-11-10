@@ -3,6 +3,7 @@
 
 module Domain.Types.SearchRequest where
 
+import qualified BecknV2.OnDemand.FareBreakup.Tax
 import Data.Aeson
 import qualified Domain.Types.Extra.MerchantPaymentMethod
 import qualified Domain.Types.Location
@@ -31,10 +32,14 @@ data SearchRequest = SearchRequest
     bapId :: Kernel.Prelude.Text,
     bapUri :: Kernel.Types.Common.BaseUrl,
     cloudType :: Kernel.Prelude.Maybe Kernel.Types.Version.CloudType,
+    commissionDeductedAtPayment :: Kernel.Prelude.Maybe Kernel.Prelude.Bool,
     configInExperimentVersions :: [Lib.Yudhishthira.Types.ConfigVersionMap],
     createdAt :: Kernel.Prelude.UTCTime,
     currency :: Kernel.Types.Common.Currency,
     customerCancellationDues :: Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney,
+    customerCancellationDuesCommission :: Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney,
+    customerCancellationDuesCommissionTaxBreakup :: Kernel.Prelude.Maybe BecknV2.OnDemand.FareBreakup.Tax.TaxBreakup,
+    customerCancellationDuesTaxBreakup :: Kernel.Prelude.Maybe BecknV2.OnDemand.FareBreakup.Tax.TaxBreakup,
     customerLanguage :: Kernel.Prelude.Maybe Tools.Maps.Language,
     customerNammaTags :: Kernel.Prelude.Maybe [Lib.Yudhishthira.Types.TagNameValue],
     device :: Kernel.Prelude.Maybe Kernel.Prelude.Text,
@@ -65,6 +70,7 @@ data SearchRequest = SearchRequest
     numberOfLuggages :: Kernel.Prelude.Maybe Kernel.Prelude.Int,
     parcelQuantity :: Kernel.Prelude.Maybe Kernel.Prelude.Int,
     parcelType :: Kernel.Prelude.Maybe Domain.Types.ParcelType.ParcelType,
+    paymentChargeDeductedAtPayment :: Kernel.Prelude.Maybe Kernel.Prelude.Bool,
     paymentMode :: Kernel.Prelude.Maybe Domain.Types.Extra.MerchantPaymentMethod.PaymentMode,
     pickupArea :: Kernel.Prelude.Maybe Lib.Types.SpecialLocation.Area,
     pickupGateId :: Kernel.Prelude.Maybe Kernel.Prelude.Text,

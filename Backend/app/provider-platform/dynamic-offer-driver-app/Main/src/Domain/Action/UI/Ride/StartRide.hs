@@ -203,7 +203,7 @@ startRideHandler ServiceHandle {..} rideId req = do
   L.setOptionLocal TxnIdKey booking.transactionId
   transporterConfig <- getOneConfig (TransporterConfigDimensions {merchantOperatingCityId = ride.merchantOperatingCityId.getId}) Nothing >>= fromMaybeM (TransporterConfigNotFound (getId ride.merchantOperatingCityId))
   when (fromMaybe False transporterConfig.airportEntryFeeCheckAtStartRide) $
-    AirportEntryFee.checkAirportEntryFeeBalanceBeforeStartRide (fromMaybe False transporterConfig.airportEntryFeeEnabled) driverId booking
+    AirportEntryFee.checkAirportEntryFeeBalanceBeforeStartRide transporterConfig driverId booking
   (openMarketAllow, includeDriverCurrentlyOnRide) <-
     maybe
       (pure (False, False))
@@ -309,12 +309,12 @@ startRideHandler ServiceHandle {..} rideId req = do
             existingPayout <- QPR.findByEntity ride.id.getId (Just DPayment.SPECIAL_ZONE_PAYOUT)
             existingScheduledPayout <- QSP.findByRideId ride.id.getId
             when (isNothing existingPayout && isNothing existingScheduledPayout) $ do
-              mbFarePolicy <- SFP.getFarePolicyByEstOrQuoteIdWithoutFallback booking.quoteId
-              commission <- FC.calculateCommission booking.fareParams mbFarePolicy
-              cancellationCommission <- FC.calculateCancellationCommission booking.fareParams mbFarePolicy
-              -- The payout base is the fare minus every commission the platform takes: ride AND cancellation.
-              let totalCommission = fromMaybe 0 commission + fromMaybe 0 cancellationCommission
-                  payoutAmountBase = if totalCommission > 0 then booking.estimatedFare - totalCommission else booking.estimatedFare
+              totalCommission <- case booking.estimatedFareSettlement of
+                Just settlement -> pure (FC.settlementCommissionTotal settlement)
+                Nothing -> do
+                  mbFarePolicy <- SFP.getFarePolicyByEstOrQuoteIdWithoutFallback booking.quoteId
+                  pure . fromMaybe 0 $ (FC.calculateCommission booking.fareParams (mbFarePolicy >>= (.commissionChargeConfig)) (((.amount) <$> FC.carriedCancellationDuesCommission booking.currency booking.fareParams (FC.bookingCancellationDuesCommission booking)))).totalCommission
+              let payoutAmountBase = if totalCommission > 0 then booking.estimatedFare - totalCommission else booking.estimatedFare
                   payoutAmount =
                     toHighPrecMoney
                       (roundToIntegral (getHighPrecMoney payoutAmountBase) :: Integer)

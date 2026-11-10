@@ -59,6 +59,7 @@ import qualified Domain.Types.Person as DP
 import qualified Domain.Types.Quote as DQuote
 import qualified Domain.Types.RefereeLink as DRL
 import Domain.Types.RideRoute
+import qualified Domain.Types.RiderDetails as DRD
 import qualified Domain.Types.RiderPreferredOption as DRPO
 import qualified Domain.Types.SearchRequest as DSR
 import qualified Domain.Types.ServiceTierType as STT
@@ -161,7 +162,6 @@ data DSearchReq = DSearchReq
     isSilentReallocationEnabled :: Maybe Bool,
     silentReallocationWindowSeconds :: Maybe Seconds,
     isMeterRideSearch :: Maybe Bool,
-    fareParametersInRateCard :: Maybe Bool,
     disabilityTag :: Maybe Text,
     dropLocation :: Maybe LatLong,
     dropAddrress :: Maybe BA.Address,
@@ -254,7 +254,6 @@ data DSearchRes = DSearchRes
     estimates :: [(DEst.Estimate, DVST.VehicleServiceTier, Maybe NearestDriverInfo, Maybe BaseUrl)],
     transporterConfig :: DTMT.TransporterConfig,
     bapId :: Text,
-    fareParametersInRateCard :: Maybe Bool,
     isMultimodalSearch :: Maybe Bool
   }
 
@@ -387,11 +386,11 @@ handler ValidatedDSearchReq {..} sReq = withTimeAPI "search" "handler" $ do
             -- both would try to insert the same new rider. Leave the insert to the real
             -- search; the dues on the freshly built record are what a new rider owes anyway.
             when (isNewRider && not sReq.isShadowSearch) $ QRD.create riderDetails
-            return riderDetails.cancellationDues
+            return (Just riderDetails)
           Nothing -> do
             logWarning "Failed to calculate Customer Cancellation Dues as BAP Phone Number is NULL"
-            return 0
-      else return 0
+            return Nothing
+      else return Nothing
   let mbDriverInfo = driverIdForSearch
   searchReq <- withTimeAPI "search" "buildSearchRequest" $ buildSearchRequest sReq bapCity mbPickupGateId mbSpecialZoneGateId mbDefaultDriverExtra possibleTripOption.schedule possibleTripOption.isScheduled merchantId' merchantOpCityId customerCancellationDue fromLocation toLocation mbDistance mbDuration mbStaticDuration spcllocationTag specialLocName allFarePoliciesProduct.area allFarePoliciesProduct.pickupArea allFarePoliciesProduct.dropArea mbTollCharges mbTollNames mbTollIds mbIsCustomerPrefferedSearchRoute mbIsBlockedRoute cityCurrency cityDistanceUnit fromLocGeohashh toLocGeohash mbVersion stops mbDriverInfo configVersionMap
   whenJust mbSetRouteInfo $ \setRouteInfo -> setRouteInfo sReq.transactionId
@@ -461,7 +460,7 @@ handler ValidatedDSearchReq {..} sReq = withTimeAPI "search" "handler" $ do
 
   driverInfoQuotes <- withTimeAPI "search" "addNearestDriverInfoQuotes" $ addNearestDriverInfo merchantOpCityId driverPool quotes configVersionMap (mbAreaForVST >>= SL.pickupSpecialZoneIdFromArea)
   driverInfoEstimates <- withTimeAPI "search" "addNearestDriverInfoEstimates" $ addNearestDriverInfo merchantOpCityId driverPool estimates configVersionMap (mbAreaForVST >>= SL.pickupSpecialZoneIdFromArea)
-  buildDSearchResp sReq.pickupLocation sReq.dropLocation (stopsLatLong sReq.stops) spcllocationTag searchMetricsMVar driverInfoQuotes driverInfoEstimates specialLocName specialLocationSupportNumber allFarePoliciesProduct.fareSettlementType now possibleTripOption.schedule sReq.fareParametersInRateCard sReq.isMultimodalSearch mbDuration
+  buildDSearchResp sReq.pickupLocation sReq.dropLocation (stopsLatLong sReq.stops) spcllocationTag searchMetricsMVar driverInfoQuotes driverInfoEstimates specialLocName specialLocationSupportNumber allFarePoliciesProduct.fareSettlementType now possibleTripOption.schedule sReq.isMultimodalSearch mbDuration
   where
     stopsLatLong = map (.gps)
     --   Check if the pickup gate supports queueing and get default driver extra.
@@ -535,7 +534,7 @@ handler ValidatedDSearchReq {..} sReq = withTimeAPI "search" "handler" $ do
           logError $ "Vehicle service tier not found for " <> show fp'.vehicleServiceTier
           pure (estimates, quotes)
 
-    buildDSearchResp fromLocation toLocation stops specialLocationTag searchMetricsMVar quotes estimates specialLocationName specialLocationSupportNumber fareSettlementType now startTime fareParametersInRateCard isMultimodalSearch mbEstimatedDuration = do
+    buildDSearchResp fromLocation toLocation stops specialLocationTag searchMetricsMVar quotes estimates specialLocationName specialLocationSupportNumber fareSettlementType now startTime isMultimodalSearch mbEstimatedDuration = do
       merchantPaymentMethods <- CQMPM.findAllByMerchantOpCityId merchantOpCityId
       let paymentMethodsInfo = DMPM.mkPaymentMethodInfo <$> merchantPaymentMethods
       return $
@@ -694,7 +693,7 @@ buildSearchRequest ::
   Bool ->
   Id DM.Merchant ->
   Id DMOC.MerchantOperatingCity ->
-  HighPrecMoney ->
+  Maybe DRD.RiderDetails ->
   DLoc.Location ->
   Maybe DLoc.Location ->
   Maybe Meters ->
@@ -753,7 +752,10 @@ buildSearchRequest DSearchReq {..} bapCity mbPickupGateId mbSpecialZoneGateId mb
         driverDefaultExtraFee = mbDefaultDriverExtra,
         pickupZoneGateId = mbSpecialZoneGateId,
         pickupGateId = mbPickupGateId,
-        customerCancellationDues = Just cancellationDues,
+        customerCancellationDues = Just (maybe 0 (.cancellationDues) cancellationDues),
+        customerCancellationDuesTaxBreakup = cancellationDues >>= (.cancellationDuesTaxBreakup),
+        customerCancellationDuesCommission = cancellationDues >>= (.cancellationDuesCommission),
+        customerCancellationDuesCommissionTaxBreakup = cancellationDues >>= (.cancellationDuesCommissionTaxBreakup),
         currency,
         roundTrip = Just roundTrip,
         isAdvanceBookingEnabled = False,
@@ -769,6 +771,8 @@ buildSearchRequest DSearchReq {..} bapCity mbPickupGateId mbSpecialZoneGateId mb
         parcelQuantity = Nothing,
         preferSafetyPlus = False,
         isPetRide = False,
+        commissionDeductedAtPayment = Nothing,
+        paymentChargeDeductedAtPayment = Nothing,
         numberOfLuggages = numberOfLuggages,
         cloudType = cloudType,
         specialLocationName = mbSpecialLocName,
@@ -841,6 +845,8 @@ buildQuote merchantOpCityId searchRequest transporterId pickupTime isScheduled r
           computationPhase = FCEstimate,
           mbCapConfig = Nothing,
           mbEstimateFareParams = Nothing,
+          paymentChargeDetails = Nothing,
+          buyerOfferDiscount = Nothing,
           actualDistance = Just dist,
           rideTime = pickupTime,
           returnTime,
@@ -859,6 +865,7 @@ buildQuote merchantOpCityId searchRequest transporterId pickupTime isScheduled r
           estimatedCongestionCharge = Nothing,
           isScheduled = isScheduled,
           customerCancellationDues = searchRequest.customerCancellationDues,
+          customerCancellationDuesTaxBreakup = searchRequest.customerCancellationDuesTaxBreakup,
           nightShiftOverlapChecking = nightShiftOverlapChecking,
           estimatedDistance = searchRequest.estimatedDistance,
           estimatedRideDuration = searchRequest.estimatedDuration,
@@ -871,15 +878,14 @@ buildQuote merchantOpCityId searchRequest transporterId pickupTime isScheduled r
           shouldApplyBusinessDiscount = False,
           shouldApplyPersonalDiscount = True,
           distanceUnit = searchRequest.distanceUnit,
-          merchantOperatingCityId = Just merchantOpCityId,
+          merchantOperatingCityId = merchantOpCityId,
           mbAdditonalChargeCategories = Nothing,
           numberOfLuggages = searchRequest.numberOfLuggages,
-          govtChargesRate = Just transporterConfig.taxConfig.rideGst,
           pickupGateId = searchRequest.pickupGateId,
           fareSettlementType = fullFarePolicy.fareSettlementType,
           isParkingFeeExempt = False
         }
-  let estimatedFare = fareSum fareParams (Just [])
+  let (estimatedFare, fareSettlement) = fareSum ((FC.fareChargeRates transporterConfig (Just fullFarePolicy) Nothing Nothing searchRequest.currency) {FC.cancellationDuesCommission = FC.searchCancellationDuesCommission searchRequest}) fareParams (Just [])
   quoteId <- Id <$> generateGUID
   void $
     if keepFarePolicyForWholeTrip isScheduled fullFarePolicy.tripCategory
@@ -919,6 +925,7 @@ buildQuote merchantOpCityId searchRequest transporterId pickupTime isScheduled r
         area = fullFarePolicy.mbArea >>= (\a -> if a == SL.Default then Nothing else Just (SL.areaToText a)),
         addOnData = [],
         isDerived = isSpotRideQuote,
+        estimatedFareSettlement = Just fareSettlement,
         ..
       }
 
@@ -958,6 +965,8 @@ buildEstimate merchantId merchantOperatingCityId currency distanceUnit mbSearchR
               computationPhase = FCEstimate,
               mbCapConfig = Nothing,
               mbEstimateFareParams = Nothing,
+              paymentChargeDetails = Nothing,
+              buyerOfferDiscount = Nothing,
               actualDistance = Just dist,
               rideTime = startTime,
               returnTime,
@@ -974,6 +983,7 @@ buildEstimate merchantId merchantOperatingCityId currency distanceUnit mbSearchR
               negotiatedFareDelta = Nothing,
               nightShiftCharge = Nothing,
               customerCancellationDues = mbSearchReq >>= (.customerCancellationDues),
+              customerCancellationDuesTaxBreakup = mbSearchReq >>= (.customerCancellationDuesTaxBreakup),
               estimatedCongestionCharge = Nothing,
               isScheduled = isScheduled,
               nightShiftOverlapChecking = nightShiftOverlapChecking,
@@ -988,10 +998,9 @@ buildEstimate merchantId merchantOperatingCityId currency distanceUnit mbSearchR
               distanceUnit,
               shouldApplyBusinessDiscount = False,
               shouldApplyPersonalDiscount = False,
-              merchantOperatingCityId = Just merchantOperatingCityId,
+              merchantOperatingCityId = merchantOperatingCityId,
               mbAdditonalChargeCategories = Nothing,
               numberOfLuggages = mbSearchReq >>= (.numberOfLuggages),
-              govtChargesRate = Just transporterConfig.taxConfig.rideGst,
               pickupGateId = mbSearchReq >>= (.pickupGateId),
               fareSettlementType = fullFarePolicy.fareSettlementType,
               isParkingFeeExempt = False
@@ -1010,19 +1019,17 @@ buildEstimate merchantId merchantOperatingCityId currency distanceUnit mbSearchR
     if keepFarePolicyForWholeTrip isScheduled fullFarePolicy.tripCategory
       then cacheFarePolicyByScheduledEstOrQuoteId estimateId.getId startTime returnTime fullFarePolicy
       else cacheFarePolicyByEstimateId estimateId.getId fullFarePolicy
-  rideCommissionCharges <- FC.calculateCommission minFareParams (Just fullFarePolicy)
-  cancellationCommissionCharges <- FC.calculateCancellationCommission minFareParams (Just fullFarePolicy)
-  -- The estimate carries ONE commission figure: ride + cancellation.
-  let commissionCharges = case (rideCommissionCharges, cancellationCommissionCharges) of
-        (Nothing, Nothing) -> Nothing
-        (a, b) -> Just (fromMaybe 0 a + fromMaybe 0 b)
+  let searchDuesCommission = mbSearchReq >>= FC.searchCancellationDuesCommission
   let pickupChargesMaxx = case fullFarePolicy.farePolicyDetails of
         DFP.ProgressiveDetails progressiveDetails ->
           if progressiveDetails.pickupCharges.pickupChargesMin == progressiveDetails.pickupCharges.pickupChargesMax then 0 else progressiveDetails.pickupCharges.pickupChargesMax - progressiveDetails.pickupCharges.pickupChargesMin
         _ -> 0
   let mbDriverExtraFeeBounds = DFP.findDriverExtraFeeBoundsByDistance dist <$> fullFarePolicy.driverExtraFeeBounds
-      minFare = fareSum minFareParams (Just []) + maybe 0.0 (.minFee) mbDriverExtraFeeBounds
-      maxFare = fareSum maxFareParams (Just []) + maybe 0.0 (.maxFee) mbDriverExtraFeeBounds + pickupChargesMaxx
+      rates = (FC.fareChargeRates transporterConfig (Just fullFarePolicy) Nothing Nothing currency) {FC.cancellationDuesCommission = searchDuesCommission}
+      withExtraFare fp extra = fp {DFareParameters.driverSelectedFare = Just (fromMaybe 0 fp.driverSelectedFare + extra)}
+      (minFare, minFareSettlement) = fareSum rates (withExtraFare minFareParams (maybe 0.0 (.minFee) mbDriverExtraFeeBounds)) (Just [])
+      (maxFare, maxFareSettlement) = fareSum rates (withExtraFare maxFareParams (maybe 0.0 (.maxFee) mbDriverExtraFeeBounds + pickupChargesMaxx)) (Just [])
+      commissionCharges = mfilter (> 0) (Just (FC.settlementCommissionTotal minFareSettlement))
   let isTollApplicable = isTollApplicableForTrip fullFarePolicy.vehicleServiceTier fullFarePolicy.tripCategory
       navigationInstruction = resolveGateNavigationInstruction navGateMap fullFarePolicy.mbArea (show fullFarePolicy.tripCategory)
   pure
@@ -1038,6 +1045,8 @@ buildEstimate merchantId merchantOperatingCityId currency distanceUnit mbSearchR
         fromLocGeohash = maybe Nothing (.fromLocGeohash) mbSearchReq,
         currency,
         fareParams = Just maxFareParams,
+        minFareSettlement = Just minFareSettlement,
+        maxFareSettlement = Just maxFareSettlement,
         farePolicy = Just $ DFP.fullFarePolicyToFarePolicy fullFarePolicy,
         tipOptions = fullFarePolicy.tipOptions,
         negativeFareSuggestion = mkNegativeFareSuggestion transporterConfig fullFarePolicy mbDistance maxFareParams,
@@ -1470,6 +1479,8 @@ transformReserveRideEsttoEst DBppEstimate.BppEstimate {..} = do
   return
     DEst.Estimate
       { commissionCharges = Nothing,
+        minFareSettlement = Nothing,
+        maxFareSettlement = Nothing,
         area = Nothing,
         navigationInstruction = Nothing,
         shadowSurgeMultiplier = Nothing,

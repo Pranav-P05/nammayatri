@@ -43,6 +43,12 @@ FareBreakupInfo:
       kvFunction: findOneWithKV
       where:
         and: [entityId, entityType]
+    findAllByEntityIdsAndEntityType:
+      kvFunction: findAllWithKV
+      where:
+        and:
+          - in: [entityId]
+          - entityType
     updateFareBreakupsByEntityIdAndEntityType:
       kvFunction: updateWithKV
       params: [fareBreakups, updatedAt]

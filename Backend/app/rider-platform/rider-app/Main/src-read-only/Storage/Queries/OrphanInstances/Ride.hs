@@ -13,6 +13,7 @@ import qualified Kernel.Types.Common
 import Kernel.Types.Error
 import qualified Kernel.Types.Id
 import Kernel.Utils.Common (CacheFlow, EsqDBFlow, MonadFlow, fromMaybeM, getCurrentTime)
+import qualified Kernel.Utils.JSON
 import qualified Kernel.Utils.Version
 import qualified SharedLogic.Type
 import qualified Storage.Beam.Ride as Beam
@@ -71,6 +72,7 @@ instance FromTType' Beam.Ride Domain.Types.Ride.Ride where
             endOtp = endOtp,
             estimatedEndTimeRange = Storage.Queries.Extra.Transformers.Ride.mkEstimatedEndTimeRange <$> estimatedEndTimeRangeStart <*> estimatedEndTimeRangeEnd,
             fare = fmap (Kernel.Types.Common.mkPrice currency) fare,
+            fareSettlement = Kernel.Utils.JSON.valueToMaybe =<< fareSettlement,
             favCount = favCount,
             feedbackSkipped = Kernel.Prelude.fromMaybe False feedbackSkipped,
             fromLocation = fromLocation',
@@ -89,7 +91,7 @@ instance FromTType' Beam.Ride Domain.Types.Ride.Ride where
             onlinePayment = Kernel.Prelude.fromMaybe False onlinePayment,
             otp = otp,
             paymentCharge = paymentCharge,
-            paymentChargeBearer = paymentChargeBearer,
+            paymentChargeBearer = paymentChargeBearer >>= (readMaybe . Data.Text.unpack),
             paymentStatus = Kernel.Prelude.fromMaybe Domain.Types.Ride.Completed paymentStatus,
             pickupEtaLogicVersion = pickupEtaLogicVersion,
             pickupRouteCallCount = pickupRouteCallCount,
@@ -178,6 +180,7 @@ instance ToTType' Beam.Ride Domain.Types.Ride.Ride where
         Beam.estimatedEndTimeRangeStart = Kernel.Prelude.fmap (.start) estimatedEndTimeRange,
         Beam.currency = Kernel.Prelude.fmap (.currency) fare,
         Beam.fare = Kernel.Prelude.fmap (.amount) fare,
+        Beam.fareSettlement = toJSON <$> fareSettlement,
         Beam.favCount = favCount,
         Beam.feedbackSkipped = Kernel.Prelude.Just feedbackSkipped,
         Beam.hasStops = hasStops,
@@ -195,7 +198,7 @@ instance ToTType' Beam.Ride Domain.Types.Ride.Ride where
         Beam.onlinePayment = Kernel.Prelude.Just onlinePayment,
         Beam.otp = otp,
         Beam.paymentCharge = paymentCharge,
-        Beam.paymentChargeBearer = paymentChargeBearer,
+        Beam.paymentChargeBearer = Data.Text.pack . show <$> paymentChargeBearer,
         Beam.paymentStatus = Kernel.Prelude.Just paymentStatus,
         Beam.pickupEtaLogicVersion = pickupEtaLogicVersion,
         Beam.pickupRouteCallCount = pickupRouteCallCount,

@@ -50,3 +50,28 @@ ALTER TABLE atlas_driver_offer_bpp.booking_update_request ADD COLUMN discount_am
 
 ALTER TABLE atlas_driver_offer_bpp.booking_update_request ADD COLUMN estimated_static_duration integer ;
 ALTER TABLE atlas_driver_offer_bpp.booking_update_request ADD COLUMN estimated_duration integer ;
+
+
+------- SQL updates -------
+
+ALTER TABLE atlas_driver_offer_bpp.booking_update_request ADD COLUMN estimated_fare_net_breakup json ;
+ALTER TABLE atlas_driver_offer_bpp.booking_update_request ADD COLUMN estimated_fare_net double precision ;
+
+
+------- SQL updates -------
+
+ALTER TABLE atlas_driver_offer_bpp.booking_update_request ADD COLUMN estimated_fare_settlement json ;
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+

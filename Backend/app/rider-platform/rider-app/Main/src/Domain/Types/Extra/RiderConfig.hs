@@ -4,6 +4,7 @@
 
 module Domain.Types.Extra.RiderConfig where
 
+import BecknV2.OnDemand.FareBreakup.SubItems (FareBreakupNode)
 import Data.Aeson
 import Data.Aeson.Types
 import Data.ByteString (ByteString)
@@ -127,3 +128,5 @@ data SyncSearchDispatchConfig = SyncSearchDispatchConfig
     fixedRoute :: Maybe RequestKindRule
   }
   deriving (Show, Eq, Ord, Generic, FromJSON, ToJSON, ToSchema)
+
+type CustomerFareBreakupNode = FareBreakupNode Text

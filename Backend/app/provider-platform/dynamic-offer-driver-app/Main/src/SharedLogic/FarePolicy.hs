@@ -10,6 +10,7 @@
 
 module SharedLogic.FarePolicy where
 
+import qualified BecknV2.OnDemand.FareBreakup.Tax as Tax
 import BecknV2.OnDemand.Tags as Tags
 import Control.Applicative ((<|>))
 import qualified Control.Concurrent
@@ -67,6 +68,7 @@ import qualified SharedLogic.FareProduct as FareProduct
 import qualified SharedLogic.Merchant as SMerchant
 import qualified SharedLogic.MetricsLabels as SML
 import SharedLogic.Pricing
+import qualified SharedLogic.RideTax as RideTax
 import qualified SharedLogic.SurgeConfig as SSC
 import Storage.Beam.Yudhishthira ()
 import qualified Storage.Cac.FarePolicy as QFP
@@ -388,8 +390,8 @@ getBaseVariantFarePolicy transporterConfig mbFromLocation mbToLocation merchantO
   mbBaseVariantFarePolicy <- join <$> traverse (\fareProduct -> getFullFarePolicy mbFromLocation mbToLocation mbFromLocGeohash mbToLocGeohash mbDistance mbDuration txnId Nothing Nothing mbAppDynamicLogicVersion mbSpecialLocName mbSpecialZoneId fareProduct configsInExperimentVersions dpInputsList (Just transporterConfig) Nothing) mbBaseVariantCarFareProduct
   case mbBaseVariantFarePolicy of
     Just baseVariantFullFarePolicy -> do
-      parameters <- calculateFareParametersForFarePolicy transporterConfig baseVariantFullFarePolicy mbDistance mbDuration merchantOpCityId
-      let estimatedFare = SFC.fareSum parameters (Just [])
+      parameters <- calculateFareParametersForFarePolicy baseVariantFullFarePolicy mbDistance mbDuration merchantOpCityId
+      let estimatedFare = fst (SFC.fareSum SFC.FareChargeRates {currency = parameters.currency, commissionChargeConfig = Nothing, rideTax = Nothing, paymentChargeDetails = Nothing, discountAmount = Nothing, cancellationDuesCommission = Nothing, deductedAtPayment = Nothing} parameters (Just []))
       -- estimatedFare <- calculateFareForFarePolicy baseVariantFullFarePolicy mbDistance mbDuration merchantOpCityId
       return $ Just estimatedFare
     Nothing -> return Nothing
@@ -506,8 +508,8 @@ getFullFarePolicy mbFromLocation mbToLocation mbFromLocGeohash mbToLocGeohash mb
               let addtionalFarePerKm = toRational $ fromMaybe 0 vehicleServiceTierItem.fareAdditionPerKmOverBaseServiceTier
               let mbAdditionalFare = mbDistance <&> \distance -> toHighPrecMoney ((fromIntegral distance.getMeters / 1000 :: Rational) * addtionalFarePerKm)
               let fareWithAddition = fromMaybe 0.0 mbBaseVaraintCarPrice + fromMaybe 0.0 mbAdditionalFare
-              parameters <- calculateFareParametersForFarePolicy transporterConfig fullFarePolicy mbDistance mbDuration fareProduct.merchantOperatingCityId
-              let estimatedFare = SFC.fareSum parameters (Just [])
+              parameters <- calculateFareParametersForFarePolicy fullFarePolicy mbDistance mbDuration fareProduct.merchantOperatingCityId
+              let estimatedFare = fst (SFC.fareSum SFC.FareChargeRates {currency = parameters.currency, commissionChargeConfig = Nothing, rideTax = Nothing, paymentChargeDetails = Nothing, discountAmount = Nothing, cancellationDuesCommission = Nothing, deductedAtPayment = Nothing} parameters (Just []))
               if fareWithAddition > estimatedFare
                 then do
                   logWarning $ "Fare with addition: " <> show fareWithAddition <> " is greater than estimated fare: " <> show estimatedFare
@@ -530,18 +532,19 @@ getFullFarePolicy mbFromLocation mbToLocation mbFromLocGeohash mbToLocGeohash mb
 updateCongestionChargeMultiplier :: FarePolicyD.FarePolicy -> Maybe FarePolicyD.CongestionChargeMultiplier -> Maybe DDriverExtraFeeBounds.DriverExtraFeeBounds -> FarePolicyD.FarePolicy
 updateCongestionChargeMultiplier FarePolicyD.FarePolicy {..} congestionMultiplier driverExtraFeeBounds' = FarePolicyD.FarePolicy {congestionChargeMultiplier = congestionMultiplier, driverExtraFeeBounds = maybe driverExtraFeeBounds (NE.nonEmpty . pure) driverExtraFeeBounds', ..}
 
-calculateFareParametersForFarePolicy :: (MonadFlow m, CacheFlow m r, EsqDBFlow m r, EsqDBReplicaFlow m r, BeamFlow m r) => TransporterConfig -> FarePolicyD.FullFarePolicy -> Maybe Meters -> Maybe Seconds -> Id DMOC.MerchantOperatingCity -> m DFareParameters.FareParameters
-calculateFareParametersForFarePolicy transporterConfig fullFarePolicy mbDistance mbDuration merchantOperatingCityId = do
+calculateFareParametersForFarePolicy :: (MonadFlow m, CacheFlow m r, EsqDBFlow m r, EsqDBReplicaFlow m r, BeamFlow m r) => FarePolicyD.FullFarePolicy -> Maybe Meters -> Maybe Seconds -> Id DMOC.MerchantOperatingCity -> m DFareParameters.FareParameters
+calculateFareParametersForFarePolicy fullFarePolicy mbDistance mbDuration merchantOperatingCityId = do
   currency <- SMerchant.getCurrencyByMerchantOpCity merchantOperatingCityId
   distanceUnit <- SMerchant.getDistanceUnitByMerchantOpCity merchantOperatingCityId
   now <- getCurrentTime
-  let gstBreakup = Just transporterConfig.taxConfig.rideGst
   let params =
         SFC.CalculateFareParametersParams
           { farePolicy = fullFarePolicy,
             computationPhase = SFC.FCEstimate,
             mbCapConfig = Nothing,
             mbEstimateFareParams = Nothing,
+            paymentChargeDetails = Nothing,
+            buyerOfferDiscount = Nothing,
             actualDistance = mbDistance,
             rideTime = now, ----------assumption as this logic should work only for one way book now trips
             returnTime = Nothing,
@@ -555,6 +558,7 @@ calculateFareParametersForFarePolicy transporterConfig fullFarePolicy mbDistance
             negativeFareAdjustment = Nothing,
             nightShiftCharge = Nothing,
             customerCancellationDues = Nothing,
+            customerCancellationDuesTaxBreakup = Nothing,
             nightShiftOverlapChecking = False, ---------considered only for one way
             isScheduled = False, ---------this rate-card path is for one-way book-now trips only
             estimatedDistance = mbDistance,
@@ -572,18 +576,18 @@ calculateFareParametersForFarePolicy transporterConfig fullFarePolicy mbDistance
             noOfStops = 0, ------fix it in future
             currency,
             distanceUnit,
-            merchantOperatingCityId = Just merchantOperatingCityId,
+            merchantOperatingCityId = merchantOperatingCityId,
             mbAdditonalChargeCategories = Nothing,
             numberOfLuggages = Nothing,
-            govtChargesRate = gstBreakup,
             pickupGateId = Nothing,
             fareSettlementType = fullFarePolicy.fareSettlementType,
             isParkingFeeExempt = False
           }
   SFC.calculateFareParameters params
 
-mkFarePolicyBreakups :: (Text -> breakupItemValue) -> (Text -> breakupItemValue -> breakupItem) -> Maybe Meters -> Maybe HighPrecMoney -> Maybe HighPrecMoney -> HighPrecMoney -> Maybe HighPrecMoney -> Maybe Double -> Bool -> FarePolicyD.FarePolicy -> [breakupItem]
-mkFarePolicyBreakups mkValue mkBreakupItem mbDistance mbCancellationCharge mbTollCharges estimatedTotalFare congestionChargeViaDp mbGovtChargesRate hasStops farePolicy = do
+mkFarePolicyBreakups :: (Text -> breakupItemValue) -> (Text -> breakupItemValue -> breakupItem) -> Maybe Meters -> Maybe HighPrecMoney -> Maybe HighPrecMoney -> HighPrecMoney -> Maybe HighPrecMoney -> Maybe TransporterConfig -> Bool -> FarePolicyD.FarePolicy -> [breakupItem]
+mkFarePolicyBreakups mkValue mkBreakupItem mbDistance mbCancellationCharge mbTollCharges estimatedTotalFare congestionChargeViaDp mbTransporterConfig hasStops farePolicy = do
+  let mbGovtChargesRate = mfilter (> 0) $ mbTransporterConfig <&> \tc -> let rideTax = RideTax.resolveTaxRates tc (Just farePolicy) Nothing in fromRational (Tax.taxRateOf rideTax.regime rideTax.riderPayable.rideFare).getHighPrecMoney :: Double
   let distance = fromMaybe 0 mbDistance -- TODO: Fix Later
       driverExtraFeeBounds = FarePolicyD.findDriverExtraFeeBoundsByDistance distance <$> farePolicy.driverExtraFeeBounds
       nightShiftBounds = farePolicy.nightShiftBounds
@@ -699,15 +703,7 @@ mkFarePolicyBreakups mkValue mkBreakupItem mbDistance mbCancellationCharge mbTol
       fixedCardChargeCaption = show Tags.FIXED_CARD_CHARGE
       fixedCardChargeItem = mkBreakupItem fixedCardChargeCaption . (mkValue . highPrecMoneyToText) <$> (farePolicy.cardCharge >>= (.fixed))
 
-      customerExtraFeeTaxItem = do
-        config <- farePolicy.vatChargeConfig
-        guard (FarePolicyD.CustomerExtraFeeComponent `elem` config.appliesOn)
-        case SFC.parseCodeValue config.value of
-          Just (SFC.ParsedPercentage pct) ->
-            Just $ mkBreakupItem (show Tags.CUSTOMER_EXTRA_FEE_TAX_MULTIPLIER) (mkValue $ show (1 + fromRational pct :: Double))
-          Just (SFC.ParsedFixed amount) ->
-            Just $ mkBreakupItem (show Tags.CUSTOMER_EXTRA_FEE_TAX_FIXED) (mkValue $ highPrecMoneyToText amount)
-          Nothing -> Nothing
+      customerExtraFeeTaxItem = mbGovtChargesRate <&> \rate -> mkBreakupItem (show Tags.CUSTOMER_EXTRA_FEE_TAX_MULTIPLIER) (mkValue $ show (1 + rate))
 
       additionalDetailsBreakups = processAdditionalDetails farePolicy.farePolicyDetails
       conditionalCharges = processAdditionalCharges farePolicy.conditionalCharges

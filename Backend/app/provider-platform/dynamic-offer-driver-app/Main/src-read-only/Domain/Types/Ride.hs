@@ -10,9 +10,11 @@ import qualified Domain.Types.Common
 import qualified Domain.Types.DriverGoHomeRequest
 import qualified Domain.Types.FareParameters
 import qualified Domain.Types.FarePolicy
+import qualified Domain.Types.FareSettlement
 import qualified Domain.Types.Location
 import qualified Domain.Types.Merchant
 import qualified Domain.Types.MerchantOperatingCity
+import qualified Domain.Types.PaymentChargeBearer
 import qualified Domain.Types.Person
 import qualified Domain.Types.RiderDetails
 import qualified Domain.Types.SubscriptionPurchase
@@ -45,6 +47,7 @@ data Ride = Ride
     cancellationFeeIfCancelled :: Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney,
     cancellationFeeTaxIfCancelled :: Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney,
     cancellationReasonCode :: Kernel.Prelude.Maybe Domain.Types.CancellationReason.CancellationReasonCode,
+    cancellationSettlement :: Kernel.Prelude.Maybe Domain.Types.FareSettlement.CancellationSettlement,
     cancelledBy :: Kernel.Prelude.Maybe Kernel.Prelude.Text,
     chargeableDistance :: Kernel.Prelude.Maybe Kernel.Types.Common.Meters,
     clientBundleVersion :: Kernel.Prelude.Maybe Kernel.Types.Version.Version,
@@ -81,6 +84,7 @@ data Ride = Ride
     estimatedTollNames :: Kernel.Prelude.Maybe [Kernel.Prelude.Text],
     fare :: Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney,
     fareParametersId :: Kernel.Prelude.Maybe (Kernel.Types.Id.Id Domain.Types.FareParameters.FareParameters),
+    fareSettlement :: Kernel.Prelude.Maybe Domain.Types.FareSettlement.FareSettlement,
     finalFarePolicyId :: Kernel.Prelude.Maybe (Kernel.Types.Id.Id Domain.Types.FarePolicy.FarePolicy),
     fleetOwnerId :: Kernel.Prelude.Maybe (Kernel.Types.Id.Id Domain.Types.Person.Person),
     fromLocation :: Domain.Types.Location.Location,
@@ -104,7 +108,7 @@ data Ride = Ride
     otp :: Kernel.Prelude.Text,
     passedThroughDestination :: Kernel.Prelude.Maybe Kernel.Prelude.Bool,
     paymentCharge :: Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney,
-    paymentChargeBearer :: Kernel.Prelude.Maybe Kernel.Prelude.Text,
+    paymentChargeBearer :: Kernel.Prelude.Maybe Domain.Types.PaymentChargeBearer.PaymentChargeBearer,
     pickupBehaviour :: Kernel.Prelude.Maybe Domain.Types.Ride.PickupBehaviour,
     pickupDarkSeconds :: Kernel.Prelude.Maybe Kernel.Prelude.Int,
     pickupDistanceCalculationFailed :: Kernel.Prelude.Maybe Kernel.Prelude.Bool,
@@ -164,12 +168,12 @@ data RideStatus = UPCOMING | NEW | INPROGRESS | COMPLETED | CANCELLED deriving (
 
 data ScheduledAcceptanceMode = AcceptedAsScheduled | AcceptedFromBroadcast | AssignedByOps | AssignedByFleetOwner deriving (Eq, Ord, Show, Read, Generic, ToJSON, FromJSON, ToSchema)
 
-$(Tools.Beam.UtilsTH.mkBeamInstancesForEnumAndList (''PickupBehaviour))
+$(Tools.Beam.UtilsTH.mkBeamInstancesForEnumAndList ''PickupBehaviour)
 
-$(Tools.Beam.UtilsTH.mkBeamInstancesForEnumAndList (''RideEndedBy))
+$(Tools.Beam.UtilsTH.mkBeamInstancesForEnumAndList ''RideEndedBy)
 
-$(Tools.Beam.UtilsTH.mkBeamInstancesForEnumAndList (''RideStatus))
+$(Tools.Beam.UtilsTH.mkBeamInstancesForEnumAndList ''RideStatus)
 
-$(mkHttpInstancesForEnum (''RideStatus))
+$(mkHttpInstancesForEnum ''RideStatus)
 
-$(Tools.Beam.UtilsTH.mkBeamInstancesForEnumAndList (''ScheduledAcceptanceMode))
+$(Tools.Beam.UtilsTH.mkBeamInstancesForEnumAndList ''ScheduledAcceptanceMode)

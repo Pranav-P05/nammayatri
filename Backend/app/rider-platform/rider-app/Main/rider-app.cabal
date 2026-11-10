@@ -476,6 +476,7 @@ library
       Domain.Types.PassOverrideConfig
       Domain.Types.RentalsIntercityCache
       Domain.Types.RewardContext
+      Domain.Types.RiderFareSettlement
       Domain.Types.Route
       Domain.Types.RouteDetailsAPI
       Domain.Types.RouteStopMapping
@@ -603,6 +604,7 @@ library
       SharedLogic.External.Nandi.Types
       SharedLogic.FareBreakdown
       SharedLogic.FareBreakupInfo
+      SharedLogic.FareBreakupLines
       SharedLogic.FeedbackForm
       SharedLogic.Finance.CashbackPayout
       SharedLogic.Finance.Rails
@@ -631,6 +633,7 @@ library
       SharedLogic.Insurance
       SharedLogic.IntegratedBPPConfig
       SharedLogic.InternalAuth
+      SharedLogic.InvoiceBreakupTitles
       SharedLogic.JobScheduler
       SharedLogic.KaalChakra.Actions
       SharedLogic.LegalPolicyEmail
@@ -652,6 +655,7 @@ library
       SharedLogic.PassExpiryReminder
       SharedLogic.PassRestore
       SharedLogic.Payment
+      SharedLogic.PaymentCharge
       SharedLogic.PaymentVendorSplits
       SharedLogic.PayoutStatusCheck
       SharedLogic.Person
@@ -664,9 +668,12 @@ library
       SharedLogic.Referral
       SharedLogic.RenderInvoiceFromTemplate
       SharedLogic.Ride
+      SharedLogic.RideFareBreakup
       SharedLogic.RideFeedback.Actions
       SharedLogic.RideFeedback.Types
+      SharedLogic.RideLedgerLines
       SharedLogic.RiderConsentPush
+      SharedLogic.RiderFareSettlement
       SharedLogic.RoutePassPricing
       SharedLogic.ScheduledNotifications
       SharedLogic.Scheduler.Jobs.BookingDepositExpiry

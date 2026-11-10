@@ -1,4 +1,5 @@
 imports:
+  FareSettlement: Domain.Types.FareSettlement
   Merchant: Domain.Types.Merchant
   MerchantOperatingCity: Domain.Types.MerchantOperatingCity
   SearchRequest: Domain.Types.SearchRequest
@@ -18,6 +19,7 @@ imports:
   Centesimal: Kernel.Types.Common
   Money: Kernel.Types.Common
   DeviceType: Kernel.Types.Version
+  Value: Data.Aeson
 
 
 DriverQuote:
@@ -71,6 +73,7 @@ DriverQuote:
     commissionCharges: Maybe HighPrecMoney
     preferenceMatchScore: Maybe Double
     isAutoAccepted: Maybe Bool
+    estimatedFareSettlement: Maybe FareSettlement
 
   beamType:
     tripCategory: Maybe TripCategory
@@ -88,6 +91,7 @@ DriverQuote:
     updatedAt: LocalTime
     currency: Maybe Currency
     distanceUnit: Maybe DistanceUnit
+    estimatedFareSettlement: Maybe Value
 
   beamFields:
     clientDevice:
@@ -118,6 +122,7 @@ DriverQuote:
     currency: fromMaybe Kernel.Types.Common.INR currency|E
     estimatedFare: Kernel.Types.Common.mkAmountWithDefault estimatedFareAmount estimatedFare|E
     distanceUnit: Kernel.Prelude.fromMaybe Kernel.Types.Common.Meter|I
+    estimatedFareSettlement: Kernel.Utils.JSON.valueToMaybe =<< estimatedFareSettlement|E
 
   toTType:
     fareParametersId: Kernel.Types.Id.getId ((.id) fareParams)|E
@@ -138,6 +143,7 @@ DriverQuote:
     distanceUnit: Kernel.Prelude.Just|I
     clientModelName: (clientDevice <&> (.deviceModel))|E
     clientManufacturer: (clientDevice >>= (.deviceManufacturer))|E
+    estimatedFareSettlement: toJSON <$> estimatedFareSettlement|E
 
   queries:
     findById:
@@ -165,6 +171,7 @@ DriverQuote:
     vehicleVariant: character varying(255)
     driverRating: double precision
     estimateId : text
+    estimatedFareSettlement: "json"
 
 
   default:

@@ -14,6 +14,8 @@
 
 module Domain.Action.Beckn.OnInit where
 
+import BecknV2.OnDemand.FareBreakup.Tax (TaxBreakup)
+import Control.Applicative ((<|>))
 import qualified Domain.Action.Beckn.Common as DCommon
 import Domain.Types
 import Domain.Types.Booking (BPPBooking, Booking)
@@ -22,7 +24,9 @@ import qualified Domain.Types.Extra.MerchantPaymentMethod as DMPM
 import qualified Domain.Types.FareBreakup as DFareBreakup
 import qualified Domain.Types.Location as DL
 import qualified Domain.Types.Merchant as DM
+import Domain.Types.PaymentChargeBearer (PaymentChargeBearer)
 import qualified Domain.Types.Person as Person
+import qualified Domain.Types.RiderFareSettlement as DRFS
 import qualified Domain.Types.VehicleVariant as DV
 import Kernel.External.Encryption (decrypt)
 import qualified Kernel.External.Maps as Maps
@@ -37,6 +41,7 @@ import qualified Safety.Storage.Queries.SafetySettingsExtra as Lib
 import qualified SharedLogic.BookingDeposit as BookingDeposit
 import qualified SharedLogic.FareBreakupInfo as SFareBreakupInfo
 import qualified SharedLogic.Person as SLP
+import qualified SharedLogic.RiderFareSettlement as SRFS
 import qualified Storage.CachedQueries.Merchant as CQM
 import qualified Storage.CachedQueries.Merchant.MerchantOperatingCity as CQMOC
 import qualified Storage.CachedQueries.ValueAddNP as CQVAN
@@ -57,8 +62,10 @@ data OnInitReq = OnInitReq
     paymentId :: Maybe Text,
     fareBreakups :: [DCommon.DFareBreakup],
     commission :: Maybe HighPrecMoney,
+    commissionTaxBreakup :: Maybe TaxBreakup,
     paymentCharge :: Maybe HighPrecMoney,
-    paymentChargeBearer :: Maybe Text
+    paymentChargeTaxBreakup :: Maybe TaxBreakup,
+    paymentChargeBearer :: Maybe PaymentChargeBearer
   }
   deriving (Show, Generic)
 
@@ -117,9 +124,20 @@ onInit :: (CacheFlow m r, EsqDBFlow m r, EncFlow m r, HedisFlow m r, Metrics.Has
 onInit req = do
   whenJust req.bppBookingId $ QRideB.updateBPPBookingId req.bookingId
   void $ QRideB.updatePaymentInfo req.bookingId req.estimatedFare req.discount req.estimatedFare req.paymentUrl -- TODO : 4th parameter is discounted fare (not implemented)
-  whenJust req.commission $ QRideB.updateCommission req.bookingId . Just
+  whenJust req.commission $ \bookingCommission -> QRideB.updateCommission req.bookingId (Just bookingCommission)
   when (isJust req.paymentCharge || isJust req.paymentChargeBearer) $ QRideB.updatePaymentCharge req.bookingId req.paymentCharge req.paymentChargeBearer
-  booking <- QRideB.findById req.bookingId >>= fromMaybeM (BookingDoesNotExist req.bookingId.getId)
+  bookingBeforeSettlement <- QRideB.findById req.bookingId >>= fromMaybeM (BookingDoesNotExist req.bookingId.getId)
+  let onInitDeductions = SRFS.mkPlatformDeductions req.commission req.commissionTaxBreakup req.paymentCharge req.paymentChargeTaxBreakup req.paymentChargeBearer Nothing
+      existingDeductions = SRFS.bookingPlatformDeductions bookingBeforeSettlement
+      platformDeductions =
+        DRFS.RiderPlatformDeductions
+          { DRFS.commission = onInitDeductions.commission <|> existingDeductions.commission,
+            DRFS.paymentCharge = onInitDeductions.paymentCharge <|> existingDeductions.paymentCharge,
+            DRFS.deductedAtPayment = onInitDeductions.deductedAtPayment <|> existingDeductions.deductedAtPayment
+          }
+      fareSettlement = SRFS.mkRiderFareSettlement bookingBeforeSettlement.estimatedFare (SRFS.offerOfSettlement bookingBeforeSettlement.estimatedFareSettlement) platformDeductions
+      booking = bookingBeforeSettlement {DRB.estimatedFareSettlement = Just fareSettlement}
+  QRideB.updateFareSettlement booking.id (Just fareSettlement)
   merchant <- CQM.findById booking.merchantId >>= fromMaybeM (MerchantNotFound booking.merchantId.getId)
   person <- QP.findById booking.riderId >>= fromMaybeM (PersonNotFound booking.riderId.getId)
   decRider <- decrypt person

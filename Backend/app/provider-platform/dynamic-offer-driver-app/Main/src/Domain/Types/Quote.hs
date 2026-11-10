@@ -20,6 +20,7 @@ import qualified Domain.Types as DVST
 import Domain.Types.AddOnConfig (AddOnData)
 import qualified Domain.Types.FareParameters as Params
 import qualified Domain.Types.FarePolicy as Policy
+import Domain.Types.FareSettlement (FareSettlement)
 import qualified Domain.Types.Merchant as DMerchant
 import qualified Domain.Types.MerchantOperatingCity as DMOC
 import Domain.Types.SearchRequest
@@ -37,6 +38,7 @@ data Quote = Quote
     tripCategory :: DTC.TripCategory,
     validTill :: UTCTime,
     estimatedFare :: HighPrecMoney,
+    estimatedFareSettlement :: Maybe FareSettlement,
     currency :: Currency,
     distance :: Maybe Meters,
     distanceUnit :: DistanceUnit,

@@ -1,4 +1,5 @@
 imports:
+  FareSettlement: Domain.Types.FareSettlement
   FareParameters: Domain.Types.FareParameters
   FarePolicy: Domain.Types.FarePolicy
   Booking: Domain.Types.Booking
@@ -6,6 +7,7 @@ imports:
   MerchantOperatingCity: Domain.Types.MerchantOperatingCity
   Price: Kernel.Types.Common
   Seconds: Kernel.Types.Common
+  Value: Data.Aeson
 
 
 BookingUpdateRequest:
@@ -48,15 +50,19 @@ BookingUpdateRequest:
     discountAmount: Maybe HighPrecMoney
     estimatedDuration: Maybe Seconds # edit route duration (original pickup -> new drop), written to the booking on confirm
     estimatedStaticDuration: Maybe Seconds # traffic-free duration of the same route
+    estimatedFareSettlement: Maybe FareSettlement
 
   beamType:
     distanceUnit: Maybe DistanceUnit
+    estimatedFareSettlement: Maybe Value
 
   fromTType:
     distanceUnit: Kernel.Prelude.fromMaybe Kernel.Types.Common.Meter|I
+    estimatedFareSettlement: Kernel.Utils.JSON.valueToMaybe =<< estimatedFareSettlement|E
 
   toTType:
     distanceUnit: Kernel.Prelude.Just|I
+    estimatedFareSettlement: toJSON <$> estimatedFareSettlement|E
 
   queries:
     findById:
@@ -75,7 +81,7 @@ BookingUpdateRequest:
         order: asc
     updateMultipleById:
       kvFunction: updateOneWithKV
-      params: [travelledDistance, estimatedFare, totalDistance, currentPointLat, currentPointLon, updatedAt]
+      params: [travelledDistance, estimatedFare, estimatedFareSettlement, totalDistance, currentPointLat, currentPointLon, updatedAt]
       where: id
     updateStatusById:
       kvFunction: updateOneWithKV
@@ -104,3 +110,6 @@ BookingUpdateRequest:
     id: PrimaryKey
     bookingId: SecondaryKey
     bapBookingUpdateRequestId : SecondaryKey
+
+  sqlType:
+    estimatedFareSettlement: "json"

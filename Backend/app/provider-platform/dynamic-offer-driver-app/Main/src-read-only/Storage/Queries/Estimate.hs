@@ -15,6 +15,7 @@ import qualified Kernel.Types.Common
 import Kernel.Types.Error
 import qualified Kernel.Types.Id
 import Kernel.Utils.Common (CacheFlow, EsqDBFlow, MonadFlow, fromMaybeM, getCurrentTime)
+import qualified Kernel.Utils.JSON
 import qualified Sequelize as Se
 import qualified Storage.Beam.Estimate as Beam
 import qualified Storage.Cac.FarePolicy
@@ -92,6 +93,7 @@ updateByPrimaryKey (Domain.Types.Estimate.Estimate {..}) = do
       Se.Set Beam.isScheduled (Kernel.Prelude.Just isScheduled),
       Se.Set Beam.maxFare (Kernel.Prelude.roundToIntegral maxFare),
       Se.Set Beam.maxFareAmount (Kernel.Prelude.Just maxFare),
+      Se.Set Beam.maxFareSettlement (toJSON <$> maxFareSettlement),
       Se.Set Beam.mbActualQARCity mbActualQARCity,
       Se.Set Beam.mbActualQARCityPast mbActualQARCityPast,
       Se.Set Beam.mbActualQARFromLocGeohash mbActualQARFromLocGeohash,
@@ -108,6 +110,7 @@ updateByPrimaryKey (Domain.Types.Estimate.Estimate {..}) = do
       Se.Set Beam.merchantOperatingCityId (Kernel.Types.Id.getId <$> merchantOperatingCityId),
       Se.Set Beam.minFare (Kernel.Prelude.roundToIntegral minFare),
       Se.Set Beam.minFareAmount (Kernel.Prelude.Just minFare),
+      Se.Set Beam.minFareSettlement (toJSON <$> minFareSettlement),
       Se.Set Beam.navigationInstruction navigationInstruction,
       Se.Set Beam.negativeFareSuggestion negativeFareSuggestion,
       Se.Set Beam.personalDiscount personalDiscount,
@@ -159,6 +162,7 @@ instance FromTType' Beam.Estimate Domain.Types.Estimate.Estimate where
             isCustomerPrefferedSearchRoute = isCustomerPrefferedSearchRoute,
             isScheduled = Kernel.Prelude.fromMaybe Kernel.Prelude.False isScheduled,
             maxFare = Kernel.Types.Common.mkAmountWithDefault maxFareAmount maxFare,
+            maxFareSettlement = Kernel.Utils.JSON.valueToMaybe =<< maxFareSettlement,
             mbActualQARCity = mbActualQARCity,
             mbActualQARCityPast = mbActualQARCityPast,
             mbActualQARFromLocGeohash = mbActualQARFromLocGeohash,
@@ -174,6 +178,7 @@ instance FromTType' Beam.Estimate Domain.Types.Estimate.Estimate where
             merchantId = Kernel.Types.Id.Id <$> merchantId,
             merchantOperatingCityId = Kernel.Types.Id.Id <$> merchantOperatingCityId,
             minFare = Kernel.Types.Common.mkAmountWithDefault minFareAmount minFare,
+            minFareSettlement = Kernel.Utils.JSON.valueToMaybe =<< minFareSettlement,
             navigationInstruction = navigationInstruction,
             negativeFareSuggestion = negativeFareSuggestion,
             personalDiscount = personalDiscount,
@@ -226,6 +231,7 @@ instance ToTType' Beam.Estimate Domain.Types.Estimate.Estimate where
         Beam.isScheduled = Kernel.Prelude.Just isScheduled,
         Beam.maxFare = Kernel.Prelude.roundToIntegral maxFare,
         Beam.maxFareAmount = Kernel.Prelude.Just maxFare,
+        Beam.maxFareSettlement = toJSON <$> maxFareSettlement,
         Beam.mbActualQARCity = mbActualQARCity,
         Beam.mbActualQARCityPast = mbActualQARCityPast,
         Beam.mbActualQARFromLocGeohash = mbActualQARFromLocGeohash,
@@ -242,6 +248,7 @@ instance ToTType' Beam.Estimate Domain.Types.Estimate.Estimate where
         Beam.merchantOperatingCityId = Kernel.Types.Id.getId <$> merchantOperatingCityId,
         Beam.minFare = Kernel.Prelude.roundToIntegral minFare,
         Beam.minFareAmount = Kernel.Prelude.Just minFare,
+        Beam.minFareSettlement = toJSON <$> minFareSettlement,
         Beam.navigationInstruction = navigationInstruction,
         Beam.negativeFareSuggestion = negativeFareSuggestion,
         Beam.personalDiscount = personalDiscount,

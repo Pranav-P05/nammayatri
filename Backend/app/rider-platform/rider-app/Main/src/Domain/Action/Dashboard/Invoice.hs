@@ -15,7 +15,7 @@ import qualified Domain.Action.UI.Invoice as UIInvoice
 import qualified "beckn-spec" Domain.Types.Invoice as DInvoice
 import qualified Domain.Types.Merchant as DM
 import Environment
-import EulerHS.Prelude hiding (id)
+import EulerHS.Prelude hiding (find, id)
 import qualified Kernel.Beam.Functions as B
 import Kernel.External.Encryption
 import Kernel.External.Types (Language (ENGLISH))
@@ -28,6 +28,7 @@ import qualified Lib.Finance.Storage.Queries.IndirectTaxTransaction as QIndirect
 import qualified Lib.Finance.Storage.Queries.Invoice as QFinanceInvoice
 import qualified Lib.Finance.Storage.Queries.InvoiceExtra as QFinanceInvoiceExtra
 import qualified Lib.Payment.Storage.HistoryQueries.PaymentTransaction as HQPaymentTransaction
+import SharedLogic.InvoiceBreakupTitles (invoiceBreakupTitles)
 import SharedLogic.Merchant (findMerchantByShortId)
 import Storage.Beam.Payment ()
 import qualified Storage.CachedQueries.Merchant.MerchantOperatingCity as CQMOC
@@ -53,36 +54,10 @@ getInvoiceInvoice merchantShortId _ from phoneNumber to = do
       case mbRide of
         Just ride -> do
           govtChargesLabel <- UIInvoice.govtChargesTitle merchant booking
-          let breakupItems =
-                [ ("BASE_FARE", "Base Fare"),
-                  ("CUSTOMER_SELECTED_FARE", "Customer Selected Fare"),
-                  ("DEAD_KILOMETER_FARE", "Dead Kilometer Fare"),
-                  ("DISTANCE_FARE", "Distance Fare"),
-                  ("DRIVER_SELECTED_FARE", "Driver Selected Fare"),
-                  ("EXTRA_TIME_FARE", "Extra Time Fare"),
-                  ("FIXED_GOVERNMENT_RATE", govtChargesLabel),
-                  ("NIGHT_SHIFT_CHARGE", "Night Shift Charge"),
-                  ("PLATFORM_FEE", "Platform Fee"),
-                  ("CGST", "CGST"),
-                  ("SGST", "SGST"),
-                  ("SERVICE_CHARGE", "Service Charge"),
-                  ("TIME_BASED_FARE", "Time Based Fare"),
-                  ("DIST_BASED_FARE", "Distance Based Fare"),
-                  ("EXTRA_DISTANCE_FARE", "Extra Distance Fare"),
-                  ("WAITING_OR_PICKUP_CHARGES", "Wating Charge"),
-                  ("PARKING_CHARGE", "Parking Charge"),
-                  ("TOLL_CHARGES", "Toll Charge"),
-                  ("RIDE_STOP_CHARGES", "Ride Stop Charges"),
-                  ("PER_STOP_CHARGES", "Per Stop Charges"),
-                  ("LUGGAGE_CHARGE", "Luggage Charge"),
-                  ("DRIVER_ALLOWANCE", "Driver Allowance"),
-                  ("AIRPORT_CONVENIENCE_FEE", "Airport Convenience Fee"),
-                  ("RETURN_FEE", "Return Fee"),
-                  ("BOOTH_CHARGE", "Booth Charge"),
-                  ("SCHEDULING_CHARGE", "Scheduling Charge")
-                ]
-          fareBreakups <- mapM (getFareBreakup booking) breakupItems
-          gateFeeBreakups <- getGateFeeBreakups booking
+          let breakupItems = invoiceBreakupTitles govtChargesLabel
+          storedBreakups <- CHFB.findFareBreakupsByBookingId booking.id booking.createdAt
+          let fareBreakups = mapMaybe (getFareBreakup storedBreakups) breakupItems
+              gateFeeBreakups = getGateFeeBreakups storedBreakups
           mbSource <- case booking.fromLocationId of
             Just fromLocId -> CHL.findLocationById fromLocId booking.createdAt
             Nothing -> return Nothing
@@ -95,7 +70,7 @@ getInvoiceInvoice merchantShortId _ from phoneNumber to = do
                 { date = booking.createdAt,
                   destination = maybe notAvailableText buildAddress mbDestination,
                   driverName = fromMaybe notAvailableText ride.driverName,
-                  faresList = catMaybes fareBreakups <> gateFeeBreakups,
+                  faresList = fareBreakups <> gateFeeBreakups,
                   rideEndTime = fromMaybe ride.updatedAt ride.rideEndTime,
                   rideStartTime = fromMaybe ride.createdAt ride.rideStartTime,
                   shortRideId = ride.shortId.getShortId,
@@ -106,23 +81,19 @@ getInvoiceInvoice merchantShortId _ from phoneNumber to = do
                   chargeableDistanceWithUnit = convertHighPrecMetersToDistance Meter <$> ride.chargeableDistance -- FIXME use proper unit
                 }
         Nothing -> return Nothing
-    getFareBreakup booking (tag, title) = do
-      fareBreakup <- CHFB.findFareBreakupByBookingIdAndDescription booking.id tag booking.createdAt
-      case fareBreakup of
-        Just breakup -> return . Just $ Common.FareBreakup {price = maybe notAvailableText show breakup.amount, title}
-        Nothing -> return Nothing
+    getFareBreakup storedBreakups (tag, title) =
+      (\breakup -> Common.FareBreakup {price = maybe notAvailableText show breakup.amount, title})
+        <$> find ((== tag) . (.description)) storedBreakups
     -- A gate fee item's title carries an operator-configured name, so it cannot be
     -- in the fixed list above. Pick them out of the stored breakups by their
     -- GATE_FEE: prefix and show each under its configured name. Matching on the
     -- prefix rather than "anything unrecognised" keeps the internal summary tags
     -- (RIDE_FARE_*, PAYMENT_CHARGE_*, ...) off the invoice.
-    getGateFeeBreakups booking = do
-      breakups <- CHFB.findFareBreakupsByBookingId booking.id booking.createdAt
-      return
-        [ Common.FareBreakup {price = maybe notAvailableText show breakup.amount, title}
-          | breakup <- breakups,
-            Just title <- [Enums.gateFeeBreakupItemName breakup.description]
-        ]
+    getGateFeeBreakups storedBreakups =
+      [ Common.FareBreakup {price = maybe notAvailableText show breakup.amount, title}
+        | breakup <- storedBreakups,
+          Just title <- [Enums.gateFeeBreakupItemName breakup.description]
+      ]
     buildAddress loc =
       case loc.ward of
         Just w -> w

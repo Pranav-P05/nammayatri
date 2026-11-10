@@ -32,421 +32,421 @@ import qualified Tools.ActorInfo
 import Tools.Auth
 import Tools.Auth.DashboardUserAuth
 
-type API = ("merchant" :> (PostMerchantUpdate :<|> GetMerchantConfigCommon :<|> PostMerchantConfigCommonUpdate :<|> GetMerchantConfigDriverPool :<|> PostMerchantConfigDriverPoolUpdate :<|> PostMerchantConfigDriverPoolCreate :<|> PostMerchantConfigDriverPoolUpsert :<|> GetMerchantConfigDriverPoolList :<|> GetMerchantConfigDriverIntelligentPool :<|> PostMerchantConfigDriverIntelligentPoolUpdate :<|> GetMerchantConfigOnboardingDocument :<|> PostMerchantConfigOnboardingDocumentUpdate :<|> PostMerchantConfigOnboardingDocumentCreate :<|> GetMerchantServiceUsageConfig :<|> PostMerchantServiceConfigMapsUpdate :<|> PostMerchantServiceUsageConfigMapsUpdate :<|> PostMerchantServiceConfigSmsUpdate :<|> PostMerchantServiceUsageConfigSmsUpdate :<|> PostMerchantServiceConfigVerificationUpdate :<|> PostMerchantConfigFarePolicyDriverExtraFeeBoundsCreate :<|> PostMerchantConfigFarePolicyDriverExtraFeeBoundsUpdate :<|> PostMerchantConfigFarePolicyPerExtraKmRateUpdate :<|> PostMerchantConfigFarePolicyUpdate :<|> PostMerchantConfigFarePolicyUpsert :<|> GetMerchantConfigFarePolicyExport :<|> GetMerchantConfigFarePolicyDetails :<|> GetMerchantConfigFareProductList :<|> PostMerchantConfigFareProductSetEnabled :<|> PostMerchantConfigOperatingCityCreate :<|> PostMerchantSchedulerTrigger :<|> PostMerchantSchedulerRevive :<|> PostMerchantUpdateOnboardingVehicleVariantMapping :<|> PostMerchantConfigSpecialLocationUpsert :<|> GetMerchantConfigSpecialLocationList :<|> GetMerchantConfigGeometryList :<|> PutMerchantConfigGeometryUpdate :<|> PostMerchantSpecialLocationUpsert :<|> DeleteMerchantSpecialLocationDelete :<|> PostMerchantSpecialLocationGatesUpsert :<|> DeleteMerchantSpecialLocationGatesDelete :<|> PostMerchantConfigTollUpsert :<|> GetMerchantConfigTollList :<|> PostMerchantTollUpsert :<|> DeleteMerchantTollDelete :<|> GetMerchantToll :<|> PostMerchantConfigClearCacheSubscription :<|> PostMerchantConfigUpsertPlanAndConfigSubscription :<|> GetMerchantConfigVendorSplitDetailsList :<|> GetMerchantConfigSubscriptionConfigList :<|> PostMerchantConfigFailover :<|> PostMerchantPayoutConfigUpdate :<|> PostMerchantConfigOperatingCityWhiteList :<|> PostMerchantConfigAllowedDestinationStates :<|> GetMerchantConfigAllowedDestinationStates :<|> PostMerchantConfigMerchantCreate :<|> GetMerchantConfigVehicleServiceTier :<|> GetMerchantConfigVehicleServiceTierList :<|> PostMerchantConfigVehicleServiceTierUpdate :<|> PostMerchantConfigVehicleServiceTierCreate :<|> PostMerchantConfigDebugLogUpdate :<|> GetMerchantMerchantDocumentList :<|> GetMerchantMerchantDocument :<|> PostMerchantMerchantDocumentCreate :<|> PostMerchantMerchantDocumentUpdate :<|> PostMerchantMerchantDocumentDelete :<|> GetMerchantMerchantMessageCatalog :<|> PostMerchantMerchantMessageUpsert :<|> DeleteMerchantMerchantMessage :<|> GetMerchantCityList :<|> PostMerchantCloudUpdate :<|> PostMerchantCloudCityUpdate :<|> GetMerchantConfigDriverWallet :<|> PostMerchantConfigDriverWalletMigratePendingDues :<|> GetMerchantConfigFareBreakup :<|> PostMerchantConfigFareBreakupUpdate))
+type API = ("merchant" :> (PostMerchantUpdate :<|> GetMerchantConfigCommon :<|> PostMerchantConfigCommonUpdate :<|> GetMerchantConfigDriverPool :<|> PostMerchantConfigDriverPoolUpdate :<|> PostMerchantConfigDriverPoolCreate :<|> PostMerchantConfigDriverPoolUpsert :<|> GetMerchantConfigDriverPoolList :<|> GetMerchantConfigDriverIntelligentPool :<|> PostMerchantConfigDriverIntelligentPoolUpdate :<|> GetMerchantConfigOnboardingDocument :<|> PostMerchantConfigOnboardingDocumentUpdate :<|> PostMerchantConfigOnboardingDocumentCreate :<|> GetMerchantServiceUsageConfig :<|> PostMerchantServiceConfigMapsUpdate :<|> PostMerchantServiceUsageConfigMapsUpdate :<|> PostMerchantServiceConfigSmsUpdate :<|> PostMerchantServiceUsageConfigSmsUpdate :<|> PostMerchantServiceConfigVerificationUpdate :<|> PostMerchantConfigFarePolicyDriverExtraFeeBoundsCreate :<|> PostMerchantConfigFarePolicyDriverExtraFeeBoundsUpdate :<|> PostMerchantConfigFarePolicyPerExtraKmRateUpdate :<|> PostMerchantConfigFarePolicyUpdate :<|> PostMerchantConfigFarePolicyUpsert :<|> GetMerchantConfigFarePolicyExport :<|> GetMerchantConfigFarePolicyDetails :<|> GetMerchantConfigFareProductList :<|> PostMerchantConfigFareProductSetEnabled :<|> PostMerchantConfigOperatingCityCreate :<|> PostMerchantSchedulerTrigger :<|> PostMerchantSchedulerRevive :<|> PostMerchantUpdateOnboardingVehicleVariantMapping :<|> PostMerchantConfigSpecialLocationUpsert :<|> GetMerchantConfigSpecialLocationList :<|> GetMerchantConfigGeometryList :<|> PutMerchantConfigGeometryUpdate :<|> PostMerchantSpecialLocationUpsert :<|> DeleteMerchantSpecialLocationDelete :<|> PostMerchantSpecialLocationGatesUpsert :<|> DeleteMerchantSpecialLocationGatesDelete :<|> PostMerchantConfigTollUpsert :<|> GetMerchantConfigTollList :<|> PostMerchantTollUpsert :<|> DeleteMerchantTollDelete :<|> GetMerchantToll :<|> PostMerchantConfigClearCacheSubscription :<|> PostMerchantConfigUpsertPlanAndConfigSubscription :<|> GetMerchantConfigVendorSplitDetailsList :<|> GetMerchantConfigSubscriptionConfigList :<|> PostMerchantConfigFailover :<|> PostMerchantPayoutConfigUpdate :<|> PostMerchantConfigOperatingCityWhiteList :<|> PostMerchantConfigAllowedDestinationStates :<|> GetMerchantConfigAllowedDestinationStates :<|> PostMerchantConfigMerchantCreate :<|> GetMerchantConfigVehicleServiceTier :<|> GetMerchantConfigVehicleServiceTierList :<|> PostMerchantConfigVehicleServiceTierUpdate :<|> PostMerchantConfigVehicleServiceTierCreate :<|> PostMerchantConfigDebugLogUpdate :<|> GetMerchantMerchantDocumentList :<|> GetMerchantMerchantDocument :<|> PostMerchantMerchantDocumentCreate :<|> PostMerchantMerchantDocumentUpdate :<|> PostMerchantMerchantDocumentDelete :<|> GetMerchantMerchantMessageCatalog :<|> PostMerchantMerchantMessageUpsert :<|> DeleteMerchantMerchantMessage :<|> GetMerchantCityList :<|> PostMerchantCloudUpdate :<|> PostMerchantCloudCityUpdate :<|> GetMerchantConfigDriverWallet :<|> PostMerchantConfigDriverWalletMigratePendingDues :<|> PostMerchantConfigDriverWalletAccountClassUpdate :<|> GetMerchantConfigFareBreakup :<|> PostMerchantConfigFareBreakupUpdate))
 
-type PostMerchantUpdate = (DashboardUserAuth 'DRIVER_OFFER_BPP_MANAGEMENT "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_UPDATE" :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantUpdate)
+type PostMerchantUpdate = (DashboardUserAuth ('DRIVER_OFFER_BPP_MANAGEMENT) "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_UPDATE" :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantUpdate)
 
 type GetMerchantConfigCommon =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/GET_MERCHANT_CONFIG_COMMON"
       :> API.Types.ProviderPlatform.Management.Merchant.GetMerchantConfigCommon
   )
 
 type PostMerchantConfigCommonUpdate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_COMMON_UPDATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigCommonUpdate
   )
 
 type GetMerchantConfigDriverPool =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/GET_MERCHANT_CONFIG_DRIVER_POOL"
       :> API.Types.ProviderPlatform.Management.Merchant.GetMerchantConfigDriverPool
   )
 
 type PostMerchantConfigDriverPoolUpdate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_DRIVER_POOL_UPDATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigDriverPoolUpdate
   )
 
 type PostMerchantConfigDriverPoolCreate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_DRIVER_POOL_CREATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigDriverPoolCreate
   )
 
 type PostMerchantConfigDriverPoolUpsert =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_DRIVER_POOL_UPSERT"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigDriverPoolUpsert
   )
 
 type GetMerchantConfigDriverPoolList =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/GET_MERCHANT_CONFIG_DRIVER_POOL_LIST"
       :> API.Types.ProviderPlatform.Management.Merchant.GetMerchantConfigDriverPoolList
   )
 
 type GetMerchantConfigDriverIntelligentPool =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/GET_MERCHANT_CONFIG_DRIVER_INTELLIGENT_POOL"
       :> API.Types.ProviderPlatform.Management.Merchant.GetMerchantConfigDriverIntelligentPool
   )
 
 type PostMerchantConfigDriverIntelligentPoolUpdate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_DRIVER_INTELLIGENT_POOL_UPDATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigDriverIntelligentPoolUpdate
   )
 
 type GetMerchantConfigOnboardingDocument =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/GET_MERCHANT_CONFIG_ONBOARDING_DOCUMENT"
       :> API.Types.ProviderPlatform.Management.Merchant.GetMerchantConfigOnboardingDocument
   )
 
 type PostMerchantConfigOnboardingDocumentUpdate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_ONBOARDING_DOCUMENT_UPDATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigOnboardingDocumentUpdate
   )
 
 type PostMerchantConfigOnboardingDocumentCreate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_ONBOARDING_DOCUMENT_CREATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigOnboardingDocumentCreate
   )
 
 type GetMerchantServiceUsageConfig =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/GET_MERCHANT_SERVICE_USAGE_CONFIG"
       :> API.Types.ProviderPlatform.Management.Merchant.GetMerchantServiceUsageConfig
   )
 
 type PostMerchantServiceConfigMapsUpdate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_SERVICE_CONFIG_MAPS_UPDATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantServiceConfigMapsUpdate
   )
 
 type PostMerchantServiceUsageConfigMapsUpdate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_SERVICE_USAGE_CONFIG_MAPS_UPDATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantServiceUsageConfigMapsUpdate
   )
 
 type PostMerchantServiceConfigSmsUpdate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_SERVICE_CONFIG_SMS_UPDATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantServiceConfigSmsUpdate
   )
 
 type PostMerchantServiceUsageConfigSmsUpdate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_SERVICE_USAGE_CONFIG_SMS_UPDATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantServiceUsageConfigSmsUpdate
   )
 
 type PostMerchantServiceConfigVerificationUpdate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_SERVICE_CONFIG_VERIFICATION_UPDATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantServiceConfigVerificationUpdate
   )
 
 type PostMerchantConfigFarePolicyDriverExtraFeeBoundsCreate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_FARE_POLICY_DRIVER_EXTRA_FEE_BOUNDS_CREATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigFarePolicyDriverExtraFeeBoundsCreate
   )
 
 type PostMerchantConfigFarePolicyDriverExtraFeeBoundsUpdate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_FARE_POLICY_DRIVER_EXTRA_FEE_BOUNDS_UPDATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigFarePolicyDriverExtraFeeBoundsUpdate
   )
 
 type PostMerchantConfigFarePolicyPerExtraKmRateUpdate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_FARE_POLICY_PER_EXTRA_KM_RATE_UPDATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigFarePolicyPerExtraKmRateUpdate
   )
 
 type PostMerchantConfigFarePolicyUpdate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_FARE_POLICY_UPDATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigFarePolicyUpdate
   )
 
 type PostMerchantConfigFarePolicyUpsert =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_FARE_POLICY_UPSERT"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigFarePolicyUpsert
   )
 
 type GetMerchantConfigFarePolicyExport =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/GET_MERCHANT_CONFIG_FARE_POLICY_EXPORT"
       :> API.Types.ProviderPlatform.Management.Merchant.GetMerchantConfigFarePolicyExport
   )
 
 type GetMerchantConfigFarePolicyDetails =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/GET_MERCHANT_CONFIG_FARE_POLICY_DETAILS"
       :> API.Types.ProviderPlatform.Management.Merchant.GetMerchantConfigFarePolicyDetails
   )
 
 type GetMerchantConfigFareProductList =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/GET_MERCHANT_CONFIG_FARE_PRODUCT_LIST"
       :> API.Types.ProviderPlatform.Management.Merchant.GetMerchantConfigFareProductList
   )
 
 type PostMerchantConfigFareProductSetEnabled =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_FARE_PRODUCT_SET_ENABLED"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigFareProductSetEnabled
   )
 
 type PostMerchantConfigOperatingCityCreate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_OPERATING_CITY_CREATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigOperatingCityCreate
   )
 
 type PostMerchantSchedulerTrigger =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_SCHEDULER_TRIGGER"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantSchedulerTrigger
   )
 
 type PostMerchantSchedulerRevive =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_SCHEDULER_REVIVE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantSchedulerRevive
   )
 
 type PostMerchantUpdateOnboardingVehicleVariantMapping =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_UPDATE_ONBOARDING_VEHICLE_VARIANT_MAPPING"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantUpdateOnboardingVehicleVariantMapping
   )
 
 type PostMerchantConfigSpecialLocationUpsert =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_SPECIAL_LOCATION_UPSERT"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigSpecialLocationUpsert
   )
 
 type GetMerchantConfigSpecialLocationList =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/GET_MERCHANT_CONFIG_SPECIAL_LOCATION_LIST"
       :> API.Types.ProviderPlatform.Management.Merchant.GetMerchantConfigSpecialLocationList
   )
 
 type GetMerchantConfigGeometryList =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/GET_MERCHANT_CONFIG_GEOMETRY_LIST"
       :> API.Types.ProviderPlatform.Management.Merchant.GetMerchantConfigGeometryList
   )
 
 type PutMerchantConfigGeometryUpdate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/PUT_MERCHANT_CONFIG_GEOMETRY_UPDATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PutMerchantConfigGeometryUpdate
   )
 
 type PostMerchantSpecialLocationUpsert =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_SPECIAL_LOCATION_UPSERT"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantSpecialLocationUpsert
   )
 
 type DeleteMerchantSpecialLocationDelete =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/DELETE_MERCHANT_SPECIAL_LOCATION_DELETE"
       :> API.Types.ProviderPlatform.Management.Merchant.DeleteMerchantSpecialLocationDelete
   )
 
 type PostMerchantSpecialLocationGatesUpsert =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_SPECIAL_LOCATION_GATES_UPSERT"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantSpecialLocationGatesUpsert
   )
 
 type DeleteMerchantSpecialLocationGatesDelete =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/DELETE_MERCHANT_SPECIAL_LOCATION_GATES_DELETE"
       :> API.Types.ProviderPlatform.Management.Merchant.DeleteMerchantSpecialLocationGatesDelete
   )
 
 type PostMerchantConfigTollUpsert =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_TOLL_UPSERT"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigTollUpsert
   )
 
 type GetMerchantConfigTollList =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/GET_MERCHANT_CONFIG_TOLL_LIST"
       :> API.Types.ProviderPlatform.Management.Merchant.GetMerchantConfigTollList
   )
 
 type PostMerchantTollUpsert =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_TOLL_UPSERT"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantTollUpsert
   )
 
 type DeleteMerchantTollDelete =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/DELETE_MERCHANT_TOLL_DELETE"
       :> API.Types.ProviderPlatform.Management.Merchant.DeleteMerchantTollDelete
   )
 
-type GetMerchantToll = (DashboardUserAuth 'DRIVER_OFFER_BPP_MANAGEMENT "PROVIDER_MANAGEMENT/MERCHANT/GET_MERCHANT_TOLL" :> API.Types.ProviderPlatform.Management.Merchant.GetMerchantToll)
+type GetMerchantToll = (DashboardUserAuth ('DRIVER_OFFER_BPP_MANAGEMENT) "PROVIDER_MANAGEMENT/MERCHANT/GET_MERCHANT_TOLL" :> API.Types.ProviderPlatform.Management.Merchant.GetMerchantToll)
 
 type PostMerchantConfigClearCacheSubscription =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_CLEAR_CACHE_SUBSCRIPTION"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigClearCacheSubscription
   )
 
 type PostMerchantConfigUpsertPlanAndConfigSubscription =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_UPSERT_PLAN_AND_CONFIG_SUBSCRIPTION"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigUpsertPlanAndConfigSubscription
   )
 
 type GetMerchantConfigVendorSplitDetailsList =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/GET_MERCHANT_CONFIG_VENDOR_SPLIT_DETAILS_LIST"
       :> API.Types.ProviderPlatform.Management.Merchant.GetMerchantConfigVendorSplitDetailsList
   )
 
 type GetMerchantConfigSubscriptionConfigList =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/GET_MERCHANT_CONFIG_SUBSCRIPTION_CONFIG_LIST"
       :> API.Types.ProviderPlatform.Management.Merchant.GetMerchantConfigSubscriptionConfigList
   )
 
 type PostMerchantConfigFailover =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_FAILOVER"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigFailover
   )
 
 type PostMerchantPayoutConfigUpdate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_PAYOUT_CONFIG_UPDATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantPayoutConfigUpdate
   )
 
 type PostMerchantConfigOperatingCityWhiteList =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_OPERATING_CITY_WHITE_LIST"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigOperatingCityWhiteList
   )
 
 type PostMerchantConfigAllowedDestinationStates =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_ALLOWED_DESTINATION_STATES"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigAllowedDestinationStates
   )
 
 type GetMerchantConfigAllowedDestinationStates =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/GET_MERCHANT_CONFIG_ALLOWED_DESTINATION_STATES"
       :> API.Types.ProviderPlatform.Management.Merchant.GetMerchantConfigAllowedDestinationStates
   )
 
 type PostMerchantConfigMerchantCreate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_MERCHANT_CREATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigMerchantCreate
   )
 
 type GetMerchantConfigVehicleServiceTier =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/GET_MERCHANT_CONFIG_VEHICLE_SERVICE_TIER"
       :> API.Types.ProviderPlatform.Management.Merchant.GetMerchantConfigVehicleServiceTier
   )
 
 type GetMerchantConfigVehicleServiceTierList =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/GET_MERCHANT_CONFIG_VEHICLE_SERVICE_TIER_LIST"
       :> API.Types.ProviderPlatform.Management.Merchant.GetMerchantConfigVehicleServiceTierList
   )
 
 type PostMerchantConfigVehicleServiceTierUpdate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_VEHICLE_SERVICE_TIER_UPDATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigVehicleServiceTierUpdate
   )
 
 type PostMerchantConfigVehicleServiceTierCreate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_VEHICLE_SERVICE_TIER_CREATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigVehicleServiceTierCreate
   )
 
 type PostMerchantConfigDebugLogUpdate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_DEBUG_LOG_UPDATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigDebugLogUpdate
   )
 
 type GetMerchantMerchantDocumentList =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/GET_MERCHANT_MERCHANT_DOCUMENT_LIST"
       :> API.Types.ProviderPlatform.Management.Merchant.GetMerchantMerchantDocumentList
   )
@@ -455,42 +455,42 @@ type GetMerchantMerchantDocument = API.Types.ProviderPlatform.Management.Merchan
 
 type PostMerchantMerchantDocumentCreate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_MERCHANT_DOCUMENT_CREATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantMerchantDocumentCreate
   )
 
 type PostMerchantMerchantDocumentUpdate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_MERCHANT_DOCUMENT_UPDATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantMerchantDocumentUpdate
   )
 
 type PostMerchantMerchantDocumentDelete =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_MERCHANT_DOCUMENT_DELETE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantMerchantDocumentDelete
   )
 
 type GetMerchantMerchantMessageCatalog =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/GET_MERCHANT_MERCHANT_MESSAGE_CATALOG"
       :> API.Types.ProviderPlatform.Management.Merchant.GetMerchantMerchantMessageCatalog
   )
 
 type PostMerchantMerchantMessageUpsert =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_MERCHANT_MESSAGE_UPSERT"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantMerchantMessageUpsert
   )
 
 type DeleteMerchantMerchantMessage =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/DELETE_MERCHANT_MERCHANT_MESSAGE"
       :> API.Types.ProviderPlatform.Management.Merchant.DeleteMerchantMerchantMessage
   )
@@ -499,48 +499,55 @@ type GetMerchantCityList = API.Types.ProviderPlatform.Management.Merchant.GetMer
 
 type PostMerchantCloudUpdate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CLOUD_UPDATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantCloudUpdate
   )
 
 type PostMerchantCloudCityUpdate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CLOUD_CITY_UPDATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantCloudCityUpdate
   )
 
 type GetMerchantConfigDriverWallet =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/GET_MERCHANT_CONFIG_DRIVER_WALLET"
       :> API.Types.ProviderPlatform.Management.Merchant.GetMerchantConfigDriverWallet
   )
 
 type PostMerchantConfigDriverWalletMigratePendingDues =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_DRIVER_WALLET_MIGRATE_PENDING_DUES"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigDriverWalletMigratePendingDues
   )
 
+type PostMerchantConfigDriverWalletAccountClassUpdate =
+  ( DashboardUserAuth
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
+      "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_DRIVER_WALLET_ACCOUNT_CLASS_UPDATE"
+      :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigDriverWalletAccountClassUpdate
+  )
+
 type GetMerchantConfigFareBreakup =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/GET_MERCHANT_CONFIG_FARE_BREAKUP"
       :> API.Types.ProviderPlatform.Management.Merchant.GetMerchantConfigFareBreakup
   )
 
 type PostMerchantConfigFareBreakupUpdate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_FARE_BREAKUP_UPDATE"
       :> API.Types.ProviderPlatform.Management.Merchant.PostMerchantConfigFareBreakupUpdate
   )
 
 handler :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> Environment.FlowServer API)
-handler merchantId city = postMerchantUpdate merchantId city :<|> getMerchantConfigCommon merchantId city :<|> postMerchantConfigCommonUpdate merchantId city :<|> getMerchantConfigDriverPool merchantId city :<|> postMerchantConfigDriverPoolUpdate merchantId city :<|> postMerchantConfigDriverPoolCreate merchantId city :<|> postMerchantConfigDriverPoolUpsert merchantId city :<|> getMerchantConfigDriverPoolList merchantId city :<|> getMerchantConfigDriverIntelligentPool merchantId city :<|> postMerchantConfigDriverIntelligentPoolUpdate merchantId city :<|> getMerchantConfigOnboardingDocument merchantId city :<|> postMerchantConfigOnboardingDocumentUpdate merchantId city :<|> postMerchantConfigOnboardingDocumentCreate merchantId city :<|> getMerchantServiceUsageConfig merchantId city :<|> postMerchantServiceConfigMapsUpdate merchantId city :<|> postMerchantServiceUsageConfigMapsUpdate merchantId city :<|> postMerchantServiceConfigSmsUpdate merchantId city :<|> postMerchantServiceUsageConfigSmsUpdate merchantId city :<|> postMerchantServiceConfigVerificationUpdate merchantId city :<|> postMerchantConfigFarePolicyDriverExtraFeeBoundsCreate merchantId city :<|> postMerchantConfigFarePolicyDriverExtraFeeBoundsUpdate merchantId city :<|> postMerchantConfigFarePolicyPerExtraKmRateUpdate merchantId city :<|> postMerchantConfigFarePolicyUpdate merchantId city :<|> postMerchantConfigFarePolicyUpsert merchantId city :<|> getMerchantConfigFarePolicyExport merchantId city :<|> getMerchantConfigFarePolicyDetails merchantId city :<|> getMerchantConfigFareProductList merchantId city :<|> postMerchantConfigFareProductSetEnabled merchantId city :<|> postMerchantConfigOperatingCityCreate merchantId city :<|> postMerchantSchedulerTrigger merchantId city :<|> postMerchantSchedulerRevive merchantId city :<|> postMerchantUpdateOnboardingVehicleVariantMapping merchantId city :<|> postMerchantConfigSpecialLocationUpsert merchantId city :<|> getMerchantConfigSpecialLocationList merchantId city :<|> getMerchantConfigGeometryList merchantId city :<|> putMerchantConfigGeometryUpdate merchantId city :<|> postMerchantSpecialLocationUpsert merchantId city :<|> deleteMerchantSpecialLocationDelete merchantId city :<|> postMerchantSpecialLocationGatesUpsert merchantId city :<|> deleteMerchantSpecialLocationGatesDelete merchantId city :<|> postMerchantConfigTollUpsert merchantId city :<|> getMerchantConfigTollList merchantId city :<|> postMerchantTollUpsert merchantId city :<|> deleteMerchantTollDelete merchantId city :<|> getMerchantToll merchantId city :<|> postMerchantConfigClearCacheSubscription merchantId city :<|> postMerchantConfigUpsertPlanAndConfigSubscription merchantId city :<|> getMerchantConfigVendorSplitDetailsList merchantId city :<|> getMerchantConfigSubscriptionConfigList merchantId city :<|> postMerchantConfigFailover merchantId city :<|> postMerchantPayoutConfigUpdate merchantId city :<|> postMerchantConfigOperatingCityWhiteList merchantId city :<|> postMerchantConfigAllowedDestinationStates merchantId city :<|> getMerchantConfigAllowedDestinationStates merchantId city :<|> postMerchantConfigMerchantCreate merchantId city :<|> getMerchantConfigVehicleServiceTier merchantId city :<|> getMerchantConfigVehicleServiceTierList merchantId city :<|> postMerchantConfigVehicleServiceTierUpdate merchantId city :<|> postMerchantConfigVehicleServiceTierCreate merchantId city :<|> postMerchantConfigDebugLogUpdate merchantId city :<|> getMerchantMerchantDocumentList merchantId city :<|> getMerchantMerchantDocument merchantId city :<|> postMerchantMerchantDocumentCreate merchantId city :<|> postMerchantMerchantDocumentUpdate merchantId city :<|> postMerchantMerchantDocumentDelete merchantId city :<|> getMerchantMerchantMessageCatalog merchantId city :<|> postMerchantMerchantMessageUpsert merchantId city :<|> deleteMerchantMerchantMessage merchantId city :<|> getMerchantCityList merchantId city :<|> postMerchantCloudUpdate merchantId city :<|> postMerchantCloudCityUpdate merchantId city :<|> getMerchantConfigDriverWallet merchantId city :<|> postMerchantConfigDriverWalletMigratePendingDues merchantId city :<|> getMerchantConfigFareBreakup merchantId city :<|> postMerchantConfigFareBreakupUpdate merchantId city
+handler merchantId city = postMerchantUpdate merchantId city :<|> getMerchantConfigCommon merchantId city :<|> postMerchantConfigCommonUpdate merchantId city :<|> getMerchantConfigDriverPool merchantId city :<|> postMerchantConfigDriverPoolUpdate merchantId city :<|> postMerchantConfigDriverPoolCreate merchantId city :<|> postMerchantConfigDriverPoolUpsert merchantId city :<|> getMerchantConfigDriverPoolList merchantId city :<|> getMerchantConfigDriverIntelligentPool merchantId city :<|> postMerchantConfigDriverIntelligentPoolUpdate merchantId city :<|> getMerchantConfigOnboardingDocument merchantId city :<|> postMerchantConfigOnboardingDocumentUpdate merchantId city :<|> postMerchantConfigOnboardingDocumentCreate merchantId city :<|> getMerchantServiceUsageConfig merchantId city :<|> postMerchantServiceConfigMapsUpdate merchantId city :<|> postMerchantServiceUsageConfigMapsUpdate merchantId city :<|> postMerchantServiceConfigSmsUpdate merchantId city :<|> postMerchantServiceUsageConfigSmsUpdate merchantId city :<|> postMerchantServiceConfigVerificationUpdate merchantId city :<|> postMerchantConfigFarePolicyDriverExtraFeeBoundsCreate merchantId city :<|> postMerchantConfigFarePolicyDriverExtraFeeBoundsUpdate merchantId city :<|> postMerchantConfigFarePolicyPerExtraKmRateUpdate merchantId city :<|> postMerchantConfigFarePolicyUpdate merchantId city :<|> postMerchantConfigFarePolicyUpsert merchantId city :<|> getMerchantConfigFarePolicyExport merchantId city :<|> getMerchantConfigFarePolicyDetails merchantId city :<|> getMerchantConfigFareProductList merchantId city :<|> postMerchantConfigFareProductSetEnabled merchantId city :<|> postMerchantConfigOperatingCityCreate merchantId city :<|> postMerchantSchedulerTrigger merchantId city :<|> postMerchantSchedulerRevive merchantId city :<|> postMerchantUpdateOnboardingVehicleVariantMapping merchantId city :<|> postMerchantConfigSpecialLocationUpsert merchantId city :<|> getMerchantConfigSpecialLocationList merchantId city :<|> getMerchantConfigGeometryList merchantId city :<|> putMerchantConfigGeometryUpdate merchantId city :<|> postMerchantSpecialLocationUpsert merchantId city :<|> deleteMerchantSpecialLocationDelete merchantId city :<|> postMerchantSpecialLocationGatesUpsert merchantId city :<|> deleteMerchantSpecialLocationGatesDelete merchantId city :<|> postMerchantConfigTollUpsert merchantId city :<|> getMerchantConfigTollList merchantId city :<|> postMerchantTollUpsert merchantId city :<|> deleteMerchantTollDelete merchantId city :<|> getMerchantToll merchantId city :<|> postMerchantConfigClearCacheSubscription merchantId city :<|> postMerchantConfigUpsertPlanAndConfigSubscription merchantId city :<|> getMerchantConfigVendorSplitDetailsList merchantId city :<|> getMerchantConfigSubscriptionConfigList merchantId city :<|> postMerchantConfigFailover merchantId city :<|> postMerchantPayoutConfigUpdate merchantId city :<|> postMerchantConfigOperatingCityWhiteList merchantId city :<|> postMerchantConfigAllowedDestinationStates merchantId city :<|> getMerchantConfigAllowedDestinationStates merchantId city :<|> postMerchantConfigMerchantCreate merchantId city :<|> getMerchantConfigVehicleServiceTier merchantId city :<|> getMerchantConfigVehicleServiceTierList merchantId city :<|> postMerchantConfigVehicleServiceTierUpdate merchantId city :<|> postMerchantConfigVehicleServiceTierCreate merchantId city :<|> postMerchantConfigDebugLogUpdate merchantId city :<|> getMerchantMerchantDocumentList merchantId city :<|> getMerchantMerchantDocument merchantId city :<|> postMerchantMerchantDocumentCreate merchantId city :<|> postMerchantMerchantDocumentUpdate merchantId city :<|> postMerchantMerchantDocumentDelete merchantId city :<|> getMerchantMerchantMessageCatalog merchantId city :<|> postMerchantMerchantMessageUpsert merchantId city :<|> deleteMerchantMerchantMessage merchantId city :<|> getMerchantCityList merchantId city :<|> postMerchantCloudUpdate merchantId city :<|> postMerchantCloudCityUpdate merchantId city :<|> getMerchantConfigDriverWallet merchantId city :<|> postMerchantConfigDriverWalletMigratePendingDues merchantId city :<|> postMerchantConfigDriverWalletAccountClassUpdate merchantId city :<|> getMerchantConfigFareBreakup merchantId city :<|> postMerchantConfigFareBreakupUpdate merchantId city
 
 postMerchantUpdate :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> API.Types.ProviderPlatform.Management.Merchant.MerchantUpdateReq -> Environment.FlowHandler API.Types.ProviderPlatform.Management.Merchant.MerchantUpdateRes)
 postMerchantUpdate a4 a3 a2 a1 =
@@ -568,7 +575,7 @@ postMerchantConfigCommonUpdate a4 a3 a2 a1 =
         Tools.ActorInfo.withDashboardUserActorInfo a2 $ Domain.Action.Dashboard.Management.Merchant.postMerchantConfigCommonUpdate a4 a3 a1
     )
 
-getMerchantConfigDriverPool :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Prelude.Maybe Kernel.Types.Common.Meters -> Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecDistance -> Kernel.Prelude.Maybe Kernel.Types.Common.DistanceUnit -> Environment.FlowHandler API.Types.ProviderPlatform.Management.Merchant.DriverPoolConfigRes)
+getMerchantConfigDriverPool :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Prelude.Maybe (Kernel.Types.Common.Meters) -> Kernel.Prelude.Maybe (Kernel.Types.Common.HighPrecDistance) -> Kernel.Prelude.Maybe (Kernel.Types.Common.DistanceUnit) -> Environment.FlowHandler API.Types.ProviderPlatform.Management.Merchant.DriverPoolConfigRes)
 getMerchantConfigDriverPool a6 a5 a4 a3 a2 a1 =
   withDashboardFlowHandlerAPI $
     ( do
@@ -576,7 +583,7 @@ getMerchantConfigDriverPool a6 a5 a4 a3 a2 a1 =
         Tools.ActorInfo.withDashboardUserActorInfo a4 $ Domain.Action.Dashboard.Management.Merchant.getMerchantConfigDriverPool a6 a5 a3 a2 a1
     )
 
-postMerchantConfigDriverPoolUpdate :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecDistance -> Kernel.Prelude.Maybe Kernel.Types.Common.DistanceUnit -> Kernel.Prelude.Maybe Dashboard.Common.VehicleVariant -> Kernel.Prelude.Maybe Kernel.Prelude.Text -> Kernel.Types.Common.Meters -> Lib.Types.SpecialLocation.Area -> API.Types.ProviderPlatform.Management.Merchant.DriverPoolConfigUpdateReq -> Environment.FlowHandler Kernel.Types.APISuccess.APISuccess)
+postMerchantConfigDriverPoolUpdate :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Prelude.Maybe (Kernel.Types.Common.HighPrecDistance) -> Kernel.Prelude.Maybe (Kernel.Types.Common.DistanceUnit) -> Kernel.Prelude.Maybe (Dashboard.Common.VehicleVariant) -> Kernel.Prelude.Maybe (Kernel.Prelude.Text) -> Kernel.Types.Common.Meters -> Lib.Types.SpecialLocation.Area -> API.Types.ProviderPlatform.Management.Merchant.DriverPoolConfigUpdateReq -> Environment.FlowHandler Kernel.Types.APISuccess.APISuccess)
 postMerchantConfigDriverPoolUpdate a10 a9 a8 a7 a6 a5 a4 a3 a2 a1 =
   withDashboardFlowHandlerAPI $
     ( do
@@ -585,7 +592,7 @@ postMerchantConfigDriverPoolUpdate a10 a9 a8 a7 a6 a5 a4 a3 a2 a1 =
         Tools.ActorInfo.withDashboardUserActorInfo a8 $ Domain.Action.Dashboard.Management.Merchant.postMerchantConfigDriverPoolUpdate a10 a9 a7 a6 a5 a4 a3 a2 a1
     )
 
-postMerchantConfigDriverPoolCreate :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecDistance -> Kernel.Prelude.Maybe Kernel.Types.Common.DistanceUnit -> Kernel.Prelude.Maybe Dashboard.Common.VehicleVariant -> Kernel.Prelude.Maybe Kernel.Prelude.Text -> Kernel.Types.Common.Meters -> Lib.Types.SpecialLocation.Area -> API.Types.ProviderPlatform.Management.Merchant.DriverPoolConfigCreateReq -> Environment.FlowHandler Kernel.Types.APISuccess.APISuccess)
+postMerchantConfigDriverPoolCreate :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Prelude.Maybe (Kernel.Types.Common.HighPrecDistance) -> Kernel.Prelude.Maybe (Kernel.Types.Common.DistanceUnit) -> Kernel.Prelude.Maybe (Dashboard.Common.VehicleVariant) -> Kernel.Prelude.Maybe (Kernel.Prelude.Text) -> Kernel.Types.Common.Meters -> Lib.Types.SpecialLocation.Area -> API.Types.ProviderPlatform.Management.Merchant.DriverPoolConfigCreateReq -> Environment.FlowHandler Kernel.Types.APISuccess.APISuccess)
 postMerchantConfigDriverPoolCreate a10 a9 a8 a7 a6 a5 a4 a3 a2 a1 =
   withDashboardFlowHandlerAPI $
     ( do
@@ -628,7 +635,7 @@ postMerchantConfigDriverIntelligentPoolUpdate a4 a3 a2 a1 =
         Tools.ActorInfo.withDashboardUserActorInfo a2 $ Domain.Action.Dashboard.Management.Merchant.postMerchantConfigDriverIntelligentPoolUpdate a4 a3 a1
     )
 
-getMerchantConfigOnboardingDocument :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Prelude.Maybe API.Types.ProviderPlatform.Management.Merchant.DocumentType -> Kernel.Prelude.Maybe Dashboard.Common.VehicleCategory -> Environment.FlowHandler API.Types.ProviderPlatform.Management.Merchant.DocumentVerificationConfigRes)
+getMerchantConfigOnboardingDocument :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Prelude.Maybe (API.Types.ProviderPlatform.Management.Merchant.DocumentType) -> Kernel.Prelude.Maybe (Dashboard.Common.VehicleCategory) -> Environment.FlowHandler API.Types.ProviderPlatform.Management.Merchant.DocumentVerificationConfigRes)
 getMerchantConfigOnboardingDocument a5 a4 a3 a2 a1 =
   withDashboardFlowHandlerAPI $
     ( do
@@ -707,7 +714,7 @@ postMerchantServiceConfigVerificationUpdate a4 a3 a2 a1 =
         Tools.ActorInfo.withDashboardUserActorInfo a2 $ Domain.Action.Dashboard.Management.Merchant.postMerchantServiceConfigVerificationUpdate a4 a3 a1
     )
 
-postMerchantConfigFarePolicyDriverExtraFeeBoundsCreate :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Types.Id.Id Dashboard.Common.FarePolicy -> Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecDistance -> Kernel.Prelude.Maybe Kernel.Types.Common.DistanceUnit -> Kernel.Types.Common.Meters -> API.Types.ProviderPlatform.Management.Merchant.CreateFPDriverExtraFeeReq -> Environment.FlowHandler Kernel.Types.APISuccess.APISuccess)
+postMerchantConfigFarePolicyDriverExtraFeeBoundsCreate :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Types.Id.Id Dashboard.Common.FarePolicy -> Kernel.Prelude.Maybe (Kernel.Types.Common.HighPrecDistance) -> Kernel.Prelude.Maybe (Kernel.Types.Common.DistanceUnit) -> Kernel.Types.Common.Meters -> API.Types.ProviderPlatform.Management.Merchant.CreateFPDriverExtraFeeReq -> Environment.FlowHandler Kernel.Types.APISuccess.APISuccess)
 postMerchantConfigFarePolicyDriverExtraFeeBoundsCreate a8 a7 a6 a5 a4 a3 a2 a1 =
   withDashboardFlowHandlerAPI $
     ( do
@@ -716,7 +723,7 @@ postMerchantConfigFarePolicyDriverExtraFeeBoundsCreate a8 a7 a6 a5 a4 a3 a2 a1 =
         Tools.ActorInfo.withDashboardUserActorInfo a6 $ Domain.Action.Dashboard.Management.Merchant.postMerchantConfigFarePolicyDriverExtraFeeBoundsCreate a8 a7 a5 a4 a3 a2 a1
     )
 
-postMerchantConfigFarePolicyDriverExtraFeeBoundsUpdate :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Types.Id.Id Dashboard.Common.FarePolicy -> Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecDistance -> Kernel.Prelude.Maybe Kernel.Types.Common.DistanceUnit -> Kernel.Types.Common.Meters -> API.Types.ProviderPlatform.Management.Merchant.CreateFPDriverExtraFeeReq -> Environment.FlowHandler Kernel.Types.APISuccess.APISuccess)
+postMerchantConfigFarePolicyDriverExtraFeeBoundsUpdate :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Types.Id.Id Dashboard.Common.FarePolicy -> Kernel.Prelude.Maybe (Kernel.Types.Common.HighPrecDistance) -> Kernel.Prelude.Maybe (Kernel.Types.Common.DistanceUnit) -> Kernel.Types.Common.Meters -> API.Types.ProviderPlatform.Management.Merchant.CreateFPDriverExtraFeeReq -> Environment.FlowHandler Kernel.Types.APISuccess.APISuccess)
 postMerchantConfigFarePolicyDriverExtraFeeBoundsUpdate a8 a7 a6 a5 a4 a3 a2 a1 =
   withDashboardFlowHandlerAPI $
     ( do
@@ -830,7 +837,7 @@ postMerchantConfigSpecialLocationUpsert a4 a3 a2 a1 =
         Tools.ActorInfo.withDashboardUserActorInfo a2 $ Domain.Action.Dashboard.Management.Merchant.postMerchantConfigSpecialLocationUpsert a4 a3 a1
     )
 
-getMerchantConfigSpecialLocationList :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Prelude.Maybe Kernel.Prelude.Int -> Kernel.Prelude.Maybe Kernel.Prelude.Int -> Kernel.Prelude.Maybe Lib.Types.SpecialLocation.SpecialLocationType -> Kernel.Prelude.Maybe [Lib.Types.SpecialLocation.SpecialLocationType] -> Environment.FlowHandler API.Types.ProviderPlatform.Management.Merchant.SpecialLocationResp)
+getMerchantConfigSpecialLocationList :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Prelude.Maybe (Kernel.Prelude.Int) -> Kernel.Prelude.Maybe (Kernel.Prelude.Int) -> Kernel.Prelude.Maybe (Lib.Types.SpecialLocation.SpecialLocationType) -> Kernel.Prelude.Maybe ([Lib.Types.SpecialLocation.SpecialLocationType]) -> Environment.FlowHandler API.Types.ProviderPlatform.Management.Merchant.SpecialLocationResp)
 getMerchantConfigSpecialLocationList a7 a6 a5 a4 a3 a2 a1 =
   withDashboardFlowHandlerAPI $
     ( do
@@ -838,7 +845,7 @@ getMerchantConfigSpecialLocationList a7 a6 a5 a4 a3 a2 a1 =
         Tools.ActorInfo.withDashboardUserActorInfo a5 $ Domain.Action.Dashboard.Management.Merchant.getMerchantConfigSpecialLocationList a7 a6 a4 a3 a2 a1
     )
 
-getMerchantConfigGeometryList :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Prelude.Maybe Kernel.Prelude.Int -> Kernel.Prelude.Maybe Kernel.Prelude.Int -> Environment.FlowHandler API.Types.ProviderPlatform.Management.Merchant.GeometryResp)
+getMerchantConfigGeometryList :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Prelude.Maybe (Kernel.Prelude.Int) -> Kernel.Prelude.Maybe (Kernel.Prelude.Int) -> Environment.FlowHandler API.Types.ProviderPlatform.Management.Merchant.GeometryResp)
 getMerchantConfigGeometryList a5 a4 a3 a2 a1 =
   withDashboardFlowHandlerAPI $
     ( do
@@ -900,7 +907,7 @@ postMerchantConfigTollUpsert a4 a3 a2 a1 =
         Tools.ActorInfo.withDashboardUserActorInfo a2 $ Domain.Action.Dashboard.Management.Merchant.postMerchantConfigTollUpsert a4 a3 a1
     )
 
-getMerchantConfigTollList :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Prelude.Maybe Kernel.Prelude.Int -> Kernel.Prelude.Maybe Kernel.Prelude.Int -> Environment.FlowHandler API.Types.ProviderPlatform.Management.Merchant.TollListResp)
+getMerchantConfigTollList :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Prelude.Maybe (Kernel.Prelude.Int) -> Kernel.Prelude.Maybe (Kernel.Prelude.Int) -> Environment.FlowHandler API.Types.ProviderPlatform.Management.Merchant.TollListResp)
 getMerchantConfigTollList a5 a4 a3 a2 a1 =
   withDashboardFlowHandlerAPI $
     ( do
@@ -1021,7 +1028,7 @@ postMerchantConfigMerchantCreate a4 a3 a2 a1 =
         Tools.ActorInfo.withDashboardUserActorInfo a2 $ Domain.Action.DashboardAuth.Management.Merchant.postMerchantConfigMerchantCreate a4 a3 a2 a1
     )
 
-getMerchantConfigVehicleServiceTier :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Prelude.Maybe Dashboard.Common.ServiceTierType -> Environment.FlowHandler API.Types.ProviderPlatform.Management.Merchant.VehicleServiceTierRes)
+getMerchantConfigVehicleServiceTier :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Prelude.Maybe (Dashboard.Common.ServiceTierType) -> Environment.FlowHandler API.Types.ProviderPlatform.Management.Merchant.VehicleServiceTierRes)
 getMerchantConfigVehicleServiceTier a4 a3 a2 a1 =
   withDashboardFlowHandlerAPI $
     ( do
@@ -1064,7 +1071,7 @@ postMerchantConfigDebugLogUpdate a4 a3 a2 a1 =
         Tools.ActorInfo.withDashboardUserActorInfo a2 $ Domain.Action.Dashboard.Management.Merchant.postMerchantConfigDebugLogUpdate a4 a3 a1
     )
 
-getMerchantMerchantDocumentList :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Prelude.Maybe Kernel.External.Types.Language -> API.Types.ProviderPlatform.Management.Merchant.MerchantDocumentRoleT -> Environment.FlowHandler API.Types.ProviderPlatform.Management.Merchant.MerchantDocumentListResp)
+getMerchantMerchantDocumentList :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Prelude.Maybe (Kernel.External.Types.Language) -> API.Types.ProviderPlatform.Management.Merchant.MerchantDocumentRoleT -> Environment.FlowHandler API.Types.ProviderPlatform.Management.Merchant.MerchantDocumentListResp)
 getMerchantMerchantDocumentList a5 a4 a3 a2 a1 =
   withDashboardFlowHandlerAPI $
     ( do
@@ -1072,7 +1079,7 @@ getMerchantMerchantDocumentList a5 a4 a3 a2 a1 =
         Tools.ActorInfo.withDashboardUserActorInfo a3 $ Domain.Action.Dashboard.Management.Merchant.getMerchantMerchantDocumentList a5 a4 a2 a1
     )
 
-getMerchantMerchantDocument :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> Kernel.Prelude.Text -> Kernel.Prelude.Maybe Kernel.External.Types.Language -> API.Types.ProviderPlatform.Management.Merchant.MerchantDocumentRoleT -> Environment.FlowHandler API.Types.ProviderPlatform.Management.Merchant.MerchantDocumentItem)
+getMerchantMerchantDocument :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> Kernel.Prelude.Text -> Kernel.Prelude.Maybe (Kernel.External.Types.Language) -> API.Types.ProviderPlatform.Management.Merchant.MerchantDocumentRoleT -> Environment.FlowHandler API.Types.ProviderPlatform.Management.Merchant.MerchantDocumentItem)
 getMerchantMerchantDocument a5 a4 a3 a2 a1 = withDashboardFlowHandlerAPI $ Tools.ActorInfo.withRequestIdActorInfo $ Domain.Action.Dashboard.Management.Merchant.getMerchantMerchantDocument a5 a4 a3 a2 a1
 
 postMerchantMerchantDocumentCreate :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> API.Types.ProviderPlatform.Management.Merchant.CreateMerchantDocumentReq -> Environment.FlowHandler API.Types.ProviderPlatform.Management.Merchant.MerchantDocumentItem)
@@ -1119,7 +1126,7 @@ postMerchantMerchantMessageUpsert a4 a3 a2 a1 =
         Tools.ActorInfo.withDashboardUserActorInfo a2 $ Domain.Action.Dashboard.Management.Merchant.postMerchantMerchantMessageUpsert a4 a3 a1
     )
 
-deleteMerchantMerchantMessage :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Prelude.Text -> Kernel.Prelude.Maybe Dashboard.Common.VehicleCategory -> Environment.FlowHandler Kernel.Types.APISuccess.APISuccess)
+deleteMerchantMerchantMessage :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Prelude.Text -> Kernel.Prelude.Maybe (Dashboard.Common.VehicleCategory) -> Environment.FlowHandler Kernel.Types.APISuccess.APISuccess)
 deleteMerchantMerchantMessage a5 a4 a3 a2 a1 =
   withDashboardFlowHandlerAPI $
     ( do
@@ -1164,6 +1171,15 @@ postMerchantConfigDriverWalletMigratePendingDues a3 a2 a1 =
         Tools.Auth.DashboardUserAuth.enforceMerchantCityAccessForUser a1 a3 a2
         Tools.Auth.DashboardUserAuth.auditDashboardAction Tools.Auth.DashboardUserAuth.DRIVER_OFFER_BPP_MANAGEMENT "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_DRIVER_WALLET_MIGRATE_PENDING_DUES" a1 (Kernel.Prelude.Nothing :: Kernel.Prelude.Maybe ())
         Tools.ActorInfo.withDashboardUserActorInfo a1 $ Domain.Action.Dashboard.Management.Merchant.postMerchantConfigDriverWalletMigratePendingDues a3 a2
+    )
+
+postMerchantConfigDriverWalletAccountClassUpdate :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> API.Types.ProviderPlatform.Management.Merchant.DriverWalletAccountClassUpdateReq -> Environment.FlowHandler Kernel.Types.APISuccess.APISuccess)
+postMerchantConfigDriverWalletAccountClassUpdate a4 a3 a2 a1 =
+  withDashboardFlowHandlerAPI $
+    ( do
+        Tools.Auth.DashboardUserAuth.enforceMerchantCityAccessForUser a2 a4 a3
+        Tools.Auth.DashboardUserAuth.auditDashboardAction Tools.Auth.DashboardUserAuth.DRIVER_OFFER_BPP_MANAGEMENT "PROVIDER_MANAGEMENT/MERCHANT/POST_MERCHANT_CONFIG_DRIVER_WALLET_ACCOUNT_CLASS_UPDATE" a2 (Kernel.Prelude.Just a1)
+        Tools.ActorInfo.withDashboardUserActorInfo a2 $ Domain.Action.Dashboard.Management.Merchant.postMerchantConfigDriverWalletAccountClassUpdate a4 a3 a1
     )
 
 getMerchantConfigFareBreakup :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Environment.FlowHandler API.Types.ProviderPlatform.Management.Merchant.FareBreakupConfigRes)

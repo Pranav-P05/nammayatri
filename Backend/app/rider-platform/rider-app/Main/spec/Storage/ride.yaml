@@ -1,4 +1,5 @@
 imports:
+  PaymentChargeBearer: Domain.Types.PaymentChargeBearer
   Merchant: Domain.Types.Merchant
   MerchantOperatingCity: Domain.Types.MerchantOperatingCity
   Location: Domain.Types.Location
@@ -27,6 +28,8 @@ imports:
   BillingCategory: SharedLogic.Type
   RefundRequestStatus: Domain.Types.RefundRequest
   Sos: Safety.Domain.Types.Sos
+  Value: Data.Aeson
+  RiderFareSettlement: Domain.Types.RiderFareSettlement
 
 Ride:
   tableName: ride
@@ -145,7 +148,8 @@ Ride:
     pickupEtaLogicVersion: Maybe Int
     commission: Maybe HighPrecMoney
     paymentCharge: Maybe HighPrecMoney
-    paymentChargeBearer: Maybe Text
+    fareSettlement: Maybe RiderFareSettlement
+    paymentChargeBearer: Maybe PaymentChargeBearer
     sosId: Maybe (Id Sos)
     isTierUpgrade: Maybe Bool
     assignedServiceTierName: Maybe Text
@@ -183,6 +187,7 @@ Ride:
     driverAlternateNumberHash: bytea
     tipAmount: numeric(30,2)
     rideTags: "text[]"
+    fareSettlement: json
 
   default:
     driverMobileNumber: "NULL"
@@ -226,6 +231,7 @@ Ride:
       tipAmount: Maybe HighPrecMoney
 
   fromTType:
+    paymentChargeBearer: (paymentChargeBearer >>= (readMaybe . Data.Text.unpack))|E
     toLocation: Storage.Queries.Extra.Transformers.Ride.getToLocation id bookingId merchantId merchantOperatingCityId|IM
     fromLocation: Storage.Queries.Extra.Transformers.Ride.getFromLocation id bookingId merchantId merchantOperatingCityId|IM
     stops: Storage.Queries.Extra.Transformers.Ride.getStops id hasStops|EM
@@ -253,9 +259,11 @@ Ride:
     isSafetyPlus: Kernel.Prelude.fromMaybe False isSafetyPlus| E
     isPetRide: Kernel.Prelude.fromMaybe False isPetRide|E
     billingCategory: Kernel.Prelude.fromMaybe SharedLogic.Type.PERSONAL billingCategory|E
+    fareSettlement: Kernel.Utils.JSON.valueToMaybe =<< fareSettlement|E
 
   # distanceUnit should be the same for all fields
   toTType:
+    paymentChargeBearer: ((Data.Text.pack . show) <$> paymentChargeBearer)|E
     fare: Kernel.Prelude.fmap (.amount)|I
     totalFare: Kernel.Prelude.fmap (.amount)|I
     currency: Kernel.Prelude.fmap (.currency)|I
@@ -290,7 +298,9 @@ Ride:
     isInsured: Kernel.Prelude.Just isInsured|E
     isPetRide: Kernel.Prelude.Just isPetRide|E
     billingCategory: Kernel.Prelude.Just billingCategory|E
+    fareSettlement: toJSON <$> fareSettlement|E
   beamType:
+    paymentChargeBearer: Maybe Text
     fare: Maybe HighPrecMoney
     totalFare: Maybe HighPrecMoney
     trackingUrl: Maybe Text
@@ -310,6 +320,7 @@ Ride:
     isInsured: Maybe Bool
     isPetRide: Maybe Bool
     billingCategory: Maybe BillingCategory
+    fareSettlement: Maybe Value
 
   constraints:
     id: PrimaryKey

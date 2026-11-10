@@ -50,6 +50,7 @@ import Kernel.Utils.Common
 import Lib.SessionizerMetrics.Types.Event
 import qualified Safety.Storage.Queries.SafetySettings as QSafetySettings
 import SharedLogic.Payment as SPayment
+import qualified SharedLogic.RiderFareSettlement as SRFS
 import qualified Storage.CachedQueries.Merchant as CQM
 import qualified Storage.Queries.Booking as QB
 import qualified Storage.Queries.BookingCancellationReason as QBCR
@@ -365,9 +366,10 @@ buildNewRide mbMerchant booking DCommon.BookingDetails {..} = do
       insuredAmount = booking.insuredAmount
       cancellationChargesOnCancel = Nothing
       pickupEtaLogicVersion = Nothing
-      commission = booking.commission
-      paymentCharge = booking.paymentCharge
-      paymentChargeBearer = booking.paymentChargeBearer
+      commission = SRFS.bookingCommission booking
+      paymentCharge = SRFS.bookingPaymentCharge booking
+      paymentChargeBearer = SRFS.bookingPaymentChargeBearer booking
+      fareSettlement = booking.estimatedFareSettlement
       pickupSpeedInMPS = Nothing
       refundRequestStatus = Nothing
       sosId = Nothing

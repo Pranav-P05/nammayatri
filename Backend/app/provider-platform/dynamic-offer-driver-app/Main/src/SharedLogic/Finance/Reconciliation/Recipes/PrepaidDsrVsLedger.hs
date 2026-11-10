@@ -48,6 +48,7 @@ import Lib.Finance.Storage.Beam.BeamFlow (BeamFlow)
 import qualified Lib.Finance.Storage.Queries.DirectTaxTransactionExtra as QDirectTaxExtra
 import qualified Lib.Finance.Storage.Queries.IndirectTaxTransactionExtra as QIndirectTaxExtra
 import qualified Lib.Finance.Storage.Queries.LedgerEntryExtra as QLedgerExtra
+import qualified SharedLogic.FareCalculator as FC
 import qualified SharedLogic.Finance.Reconciliation.EntitySync as EntitySync
 import SharedLogic.Finance.Wallet
   ( walletReferenceBaseRide,
@@ -55,6 +56,7 @@ import SharedLogic.Finance.Wallet
     walletReferenceCommissionOnline,
     walletReferenceCustomerCancellationCharges,
     walletReferenceCustomerCancellationGST,
+    walletReferenceCustomerCancellationVAT,
     walletReferenceDriverCancellationCharges,
     walletReferenceGSTCash,
     walletReferenceGSTOnline,
@@ -238,6 +240,7 @@ fetchTargets _scope bookingIds = do
         walletReferenceCustomerCancellationCharges,
         walletReferenceDriverCancellationCharges,
         walletReferenceCustomerCancellationGST,
+        walletReferenceCustomerCancellationVAT,
         walletReferenceTollCharges,
         walletReferenceParkingCharges,
         walletReferenceTDSDeductionOnline,
@@ -364,8 +367,7 @@ computeExpected booking mbRide mbFareParams indirectTaxTxns directTaxTxns =
       baseFare = fromMaybe booking.estimatedFare (mbRide >>= (.fare))
       tollCharges = fromMaybe 0 $ (mbRide >>= (.tollCharges)) <|> booking.tollCharges
       parkingCharges = fromMaybe 0 fareParams.parkingCharge
-      govtCharges = fromMaybe 0 fareParams.govtCharges
-      expectedGross = Just (baseFare - tollCharges - parkingCharges - govtCharges)
+      expectedGross = Just (FC.netRideFare fareParams baseFare)
       expectedToll = Just tollCharges
       expectedParking = Just parkingCharges
       expectedCust = mbRide >>= (.cancellationChargesOnCancel)
@@ -428,7 +430,7 @@ computeActualFromLedger entries =
           vatCash = look walletReferenceVATCash,
           custCancel = look walletReferenceCustomerCancellationCharges,
           driverCancel = look walletReferenceDriverCancellationCharges,
-          custCancelGst = look walletReferenceCustomerCancellationGST,
+          custCancelGst = look walletReferenceCustomerCancellationGST <|> look walletReferenceCustomerCancellationVAT,
           toll = look walletReferenceTollCharges,
           parking = look walletReferenceParkingCharges,
           tdsOnline = look walletReferenceTDSDeductionOnline,

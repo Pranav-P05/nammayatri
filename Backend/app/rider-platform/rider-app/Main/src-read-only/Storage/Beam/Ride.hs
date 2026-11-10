@@ -3,6 +3,7 @@
 
 module Storage.Beam.Ride where
 
+import qualified Data.Aeson
 import qualified Database.Beam as B
 import Domain.Types.Common ()
 import qualified Domain.Types.RefundRequest
@@ -72,6 +73,7 @@ data RideT f = RideT
     estimatedEndTimeRangeStart :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.UTCTime),
     currency :: B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.Currency),
     fare :: B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney),
+    fareSettlement :: B.C f (Kernel.Prelude.Maybe Data.Aeson.Value),
     favCount :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Int),
     feedbackSkipped :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Bool),
     hasStops :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Bool),

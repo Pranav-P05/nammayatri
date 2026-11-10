@@ -105,3 +105,34 @@ ALTER TABLE atlas_driver_offer_bpp.search_try ADD COLUMN is_silent_reallocation 
 
 ALTER TABLE atlas_driver_offer_bpp.search_try ADD COLUMN silent_reallocation_window_ends_at timestamp with time zone ;
 ALTER TABLE atlas_driver_offer_bpp.search_try ADD COLUMN reallocation_outcome character varying (255) ;
+
+
+------- SQL updates -------
+
+ALTER TABLE atlas_driver_offer_bpp.search_try ADD COLUMN payment_charge_details json ;
+ALTER TABLE atlas_driver_offer_bpp.search_try ADD COLUMN discount_amount double precision ;
+
+
+------- SQL updates -------
+
+ALTER TABLE atlas_driver_offer_bpp.search_try ADD COLUMN base_fare_net_breakup json ;
+ALTER TABLE atlas_driver_offer_bpp.search_try ADD COLUMN base_fare_net double precision ;
+
+
+------- SQL updates -------
+
+ALTER TABLE atlas_driver_offer_bpp.search_try ADD COLUMN base_fare_settlement json ;
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+

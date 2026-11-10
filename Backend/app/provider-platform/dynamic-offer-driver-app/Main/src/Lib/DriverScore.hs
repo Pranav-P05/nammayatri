@@ -215,7 +215,7 @@ eventPayloadHandler merchantOpCityId DST.OnRideCompletion {..} = do
           -- allRides <- RQ.findAllRidesByDriverId driverId
           let completedRides = filter ((== DR.COMPLETED) . (.status)) allRides
               farePramIds = mapMaybe (.fareParametersId) completedRides
-              totalEarnings = sum $ map (\r -> driverEffectiveFare r.fare r.paymentCharge r.paymentChargeBearer) completedRides
+              totalEarnings = sum $ map (\r -> driverEffectiveFare ((.net) <$> r.fareSettlement) r.fare r.paymentCharge r.paymentChargeBearer) completedRides
           driverSelectedFareEarnings <- B.runInReplica $ FPQ.findDriverSelectedFareEarnings farePramIds
           -- driverSelectedFareEarnings <- FPQ.findDriverSelectedFareEarnings farePramIds
           customerExtraFeeEarnings <- B.runInReplica $ FPQ.findCustomerExtraFees farePramIds
@@ -230,7 +230,7 @@ eventPayloadHandler merchantOpCityId DST.OnRideCompletion {..} = do
           -- mbBooking <- BQ.findById ride.bookingId
           let incrementBonusEarningsBy = fromMaybe 0.0 $ (\booking' -> Just $ fromMaybe 0.0 booking'.fareParams.driverSelectedFare + fromMaybe 0.0 booking'.fareParams.customerExtraFee) =<< mbBooking
           incrementLateNightTripsCountBy <- isLateNightRide fareParameter
-          pure (driverEffectiveFare ride.fare ride.paymentCharge ride.paymentChargeBearer, incrementBonusEarningsBy, incrementLateNightTripsCountBy, 10)
+          pure (driverEffectiveFare ((.net) <$> ride.fareSettlement) ride.fare ride.paymentCharge ride.paymentChargeBearer, incrementBonusEarningsBy, incrementLateNightTripsCountBy, 10)
     -- Esq.runNoTransaction $ do
     DSQ.incrementTotalEarningsAndBonusEarnedAndLateNightTrip (cast driverId) incrementTotalEarningsBy (incrementBonusEarningsBy + overallPickupCharges) incrementLateNightTripsCountBy
 
@@ -274,7 +274,7 @@ updateDailyStats driverId merchantOpCityId ride fareParameter = do
             DDS.DailyStats
               { id = id,
                 driverId = driverId,
-                totalEarnings = driverEffectiveFare ride.fare ride.paymentCharge ride.paymentChargeBearer,
+                totalEarnings = driverEffectiveFare ((.net) <$> ride.fareSettlement) ride.fare ride.paymentCharge ride.paymentChargeBearer,
                 numRides = 1,
                 totalDistance = fromMaybe 0 ride.chargeableDistance,
                 merchantLocalDate = utctDay localTime,
@@ -304,7 +304,7 @@ updateDailyStats driverId merchantOpCityId ride fareParameter = do
               }
       SQDS.create dailyStatsOfDriver'
     Just dailyStats -> do
-      let totalEarnings = dailyStats.totalEarnings + driverEffectiveFare ride.fare ride.paymentCharge ride.paymentChargeBearer
+      let totalEarnings = dailyStats.totalEarnings + driverEffectiveFare ((.net) <$> ride.fareSettlement) ride.fare ride.paymentCharge ride.paymentChargeBearer
           numRides = dailyStats.numRides + 1
           totalDistance = dailyStats.totalDistance + fromMaybe 0 ride.chargeableDistance
           merchantLocalDate = utctDay localTime
@@ -332,7 +332,7 @@ createDriverStat currency distanceUnit driverId = do
           { driverId = cast driverId,
             idleSince = now,
             totalRides = length completedRides,
-            totalEarnings = sum $ map (\r -> driverEffectiveFare r.fare r.paymentCharge r.paymentChargeBearer) completedRides,
+            totalEarnings = sum $ map (\r -> driverEffectiveFare ((.net) <$> r.fareSettlement) r.fare r.paymentCharge r.paymentChargeBearer) completedRides,
             bonusEarned = driverSelectedFare + customerExtraFee + deadKmFare,
             lateNightTrips = lateNightTripsCount,
             earningsMissed = missedEarnings,

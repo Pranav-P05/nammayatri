@@ -2,15 +2,17 @@
 
 module SharedLogic.Quote where
 
+import qualified BecknV2.OnDemand.FareBreakup.Core as FB
 import Control.Applicative
+import qualified Data.Map.Strict as Map
 import Data.OpenApi (ToSchema (..), genericDeclareNamedSchema)
 import qualified Domain.Action.UI.DriverOffer as UDriverOffer
 import qualified Domain.Action.UI.InterCityDetails as DInterCityDetails
 import qualified Domain.Action.UI.RentalDetails as DRentalDetails
 import qualified Domain.Action.UI.SpecialZoneQuote as USpecialZoneQuote
-import Domain.SharedLogic.RideDiscount (isProjectedFareParamTag)
 import Domain.Types.BppDetails as DBppDetails
 import qualified Domain.Types.DriverOffer as DDriverOffer
+import Domain.Types.FareBreakupInfo (FareBreakupInfoItem)
 import Domain.Types.Quote
 import Domain.Types.QuoteBreakup
 import Domain.Types.ServiceTierType as DVST
@@ -20,7 +22,9 @@ import Kernel.Prelude
 import Kernel.Types.Common
 import Kernel.Types.Id
 import qualified Lib.Types.SpecialLocation as SL
+import qualified SharedLogic.FareBreakupLines as FBL
 import qualified SharedLogic.Offer as SOffer
+import qualified SharedLogic.PaymentCharge as SPaymentCharge
 import qualified Tools.JSON as J
 import qualified Tools.Schema as S
 
@@ -66,25 +70,29 @@ data QuoteBreakupAPIEntity = QuoteBreakupAPIEntity
   }
   deriving (Generic, Show, ToJSON, FromJSON, ToSchema)
 
-makeQuoteAPIEntity :: Quote -> DBppDetails.BppDetails -> Bool -> QuoteAPIEntity
-makeQuoteAPIEntity (Quote {..}) bppDetails isValueAddNP =
+makeQuoteAPIEntity :: Maybe SPaymentCharge.PaymentChargeDetails -> Maybe [FareBreakupInfoItem] -> Quote -> DBppDetails.BppDetails -> Bool -> QuoteAPIEntity
+makeQuoteAPIEntity mbPaymentCharge mbFareBreakups (Quote {..}) bppDetails isValueAddNP =
   let agencyCompletedRidesCount = Just 0
       providerNum = fromMaybe "+91" bppDetails.supportNumber
+      quoteLines = maybe [] (.breakupLines) (FBL.fareLinesFromRateCard estimatedFare.amount mbFareBreakups [(breakup.title, breakup.price.amount) | breakup <- quoteBreakupList])
+      grossOf fare = mkPrice (Just fare.currency) (SPaymentCharge.grossFromLines fare.currency mbPaymentCharge fare.amount quoteLines)
+      grossFare = grossOf estimatedFare
+      grossTotalFare = grossOf estimatedTotalFare
    in QuoteAPIEntity
         { agencyName = bppDetails.name,
           agencyNumber = Just providerNum,
           tripTerms = [],
           quoteDetails = mkQuoteAPIDetails (tollChargesInfo <&> (mkPriceAPIEntity . (.tollCharges))) quoteDetails,
-          estimatedFare = estimatedFare.amountInt,
-          estimatedTotalFare = estimatedTotalFare.amountInt,
+          estimatedFare = grossFare.amountInt,
+          estimatedTotalFare = grossTotalFare.amountInt,
           discount = discount <&> (.amountInt),
-          estimatedFareWithCurrency = mkPriceAPIEntity estimatedFare,
-          estimatedTotalFareWithCurrency = mkPriceAPIEntity estimatedTotalFare,
-          discountWithCurrency = mkPriceAPIEntity <$> discount,
+          estimatedFareWithCurrency = mkRoundedPriceAPIEntity grossFare,
+          estimatedTotalFareWithCurrency = mkRoundedPriceAPIEntity grossTotalFare,
+          discountWithCurrency = mkRoundedPriceAPIEntity <$> discount,
           bookingDepositWithCurrency = mkPriceAPIEntity . mkPrice (Just estimatedFare.currency) <$> bookingDeposit,
           vehicleVariant = vehicleServiceTierType,
           customerOffers = Nothing,
-          quoteFareBreakup = filter (not . isProjectedFareParamTag . (.title)) (mkQuoteBreakupAPIEntity <$> quoteBreakupList),
+          quoteFareBreakup = mkQuoteBreakupAPIEntity <$> FB.withoutHiddenLines (.title) quoteBreakupList,
           vehicleIconUrl = showBaseUrl <$> vehicleIconUrl,
           ..
         }
@@ -93,7 +101,7 @@ mkQuoteBreakupAPIEntity :: QuoteBreakup -> QuoteBreakupAPIEntity
 mkQuoteBreakupAPIEntity QuoteBreakup {..} = do
   QuoteBreakupAPIEntity
     { title = title,
-      priceWithCurrency = mkPriceAPIEntity price
+      priceWithCurrency = mkRoundedPriceAPIEntity price
     }
 
 instance ToJSON QuoteAPIDetails where
@@ -133,8 +141,8 @@ mkQuoteAPIDetails tollCharges = \case
   InterCityDetails details -> InterCityAPIDetails $ DInterCityDetails.mkInterCityDetailsAPIEntity details tollCharges
   EasyBookingDetails details -> EasyBookingAPIDetails $ DRentalDetails.mkRentalDetailsAPIEntity details tollCharges
 
-mkQAPIEntityList :: [Quote] -> [DBppDetails.BppDetails] -> [Bool] -> [QuoteAPIEntity]
-mkQAPIEntityList (q : qRemaining) (bpp : bppRemaining) (isValueAddNP : remVNP) =
-  makeQuoteAPIEntity q bpp isValueAddNP : mkQAPIEntityList qRemaining bppRemaining remVNP
-mkQAPIEntityList [] [] [] = []
-mkQAPIEntityList _ _ _ = [] -- This should never happen as all the list are of same length
+mkQAPIEntityList :: Maybe SPaymentCharge.PaymentChargeDetails -> Map.Map Text [FareBreakupInfoItem] -> [Quote] -> [DBppDetails.BppDetails] -> [Bool] -> [QuoteAPIEntity]
+mkQAPIEntityList mbPaymentCharge fareBreakupsByQuote (q : qRemaining) (bpp : bppRemaining) (isValueAddNP : remVNP) =
+  makeQuoteAPIEntity mbPaymentCharge (Map.lookup q.id.getId fareBreakupsByQuote) q bpp isValueAddNP : mkQAPIEntityList mbPaymentCharge fareBreakupsByQuote qRemaining bppRemaining remVNP
+mkQAPIEntityList _ _ [] [] [] = []
+mkQAPIEntityList _ _ _ _ _ = [] -- This should never happen as all the list are of same length

@@ -285,3 +285,34 @@ ALTER TABLE atlas_driver_offer_bpp.search_request_for_driver ADD COLUMN display_
 
 ------- SQL updates -------
 
+
+
+
+------- SQL updates -------
+
+ALTER TABLE atlas_driver_offer_bpp.search_request_for_driver ADD COLUMN base_fare_net_breakup json ;
+ALTER TABLE atlas_driver_offer_bpp.search_request_for_driver ADD COLUMN base_fare_net double precision ;
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+ALTER TABLE atlas_driver_offer_bpp.search_request_for_driver ADD COLUMN base_fare_settlement json ;
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+

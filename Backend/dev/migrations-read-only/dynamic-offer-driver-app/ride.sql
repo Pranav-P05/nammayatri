@@ -363,3 +363,119 @@ ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN route_deviated_at_ride_end bo
 ------- SQL updates -------
 
 ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN bap_settled boolean ;
+
+
+------- SQL updates -------
+
+ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN payment_charge_tax_breakup json ;
+ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN commission_tax_breakup json ;
+ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN cancellation_fee_tax_breakup_if_cancelled json ;
+ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN cancellation_commission_tax_breakup_if_cancelled json ;
+ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN cancellation_commission_tax_breakup json ;
+ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN cancellation_commission_if_cancelled double precision ;
+ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN cancellation_charges_on_cancel_tax double precision ;
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN fare_net_breakup json ;
+ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN fare_net double precision ;
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN fare_settlement json ;
+ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN cancellation_settlement json ;
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+

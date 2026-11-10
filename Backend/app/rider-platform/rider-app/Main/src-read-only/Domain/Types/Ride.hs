@@ -9,8 +9,10 @@ import qualified Domain.Types.Client
 import qualified Domain.Types.Location
 import qualified Domain.Types.Merchant
 import qualified Domain.Types.MerchantOperatingCity
+import qualified Domain.Types.PaymentChargeBearer
 import qualified Domain.Types.RefundRequest
 import qualified Domain.Types.RideStatus
+import qualified Domain.Types.RiderFareSettlement
 import qualified Domain.Types.ServiceTierType
 import qualified Domain.Types.VehicleVariant
 import Kernel.External.Encryption
@@ -68,6 +70,7 @@ data RideE e = Ride
     endOtp :: Kernel.Prelude.Maybe Kernel.Prelude.Text,
     estimatedEndTimeRange :: Kernel.Prelude.Maybe Domain.Types.Ride.EstimatedEndTimeRange,
     fare :: Kernel.Prelude.Maybe Kernel.Types.Common.Price,
+    fareSettlement :: Kernel.Prelude.Maybe Domain.Types.RiderFareSettlement.RiderFareSettlement,
     favCount :: Kernel.Prelude.Maybe Kernel.Prelude.Int,
     feedbackSkipped :: Kernel.Prelude.Bool,
     fromLocation :: Domain.Types.Location.Location,
@@ -86,7 +89,7 @@ data RideE e = Ride
     onlinePayment :: Kernel.Prelude.Bool,
     otp :: Kernel.Prelude.Text,
     paymentCharge :: Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney,
-    paymentChargeBearer :: Kernel.Prelude.Maybe Kernel.Prelude.Text,
+    paymentChargeBearer :: Kernel.Prelude.Maybe Domain.Types.PaymentChargeBearer.PaymentChargeBearer,
     paymentStatus :: Domain.Types.Ride.PaymentStatus,
     pickupEtaLogicVersion :: Kernel.Prelude.Maybe Kernel.Prelude.Int,
     pickupRouteCallCount :: Kernel.Prelude.Maybe Kernel.Prelude.Int,
@@ -175,6 +178,7 @@ instance EncryptedItem Ride where
           endOtp = endOtp entity,
           estimatedEndTimeRange = estimatedEndTimeRange entity,
           fare = fare entity,
+          fareSettlement = fareSettlement entity,
           favCount = favCount entity,
           feedbackSkipped = feedbackSkipped entity,
           fromLocation = fromLocation entity,
@@ -274,6 +278,7 @@ instance EncryptedItem Ride where
             endOtp = endOtp entity,
             estimatedEndTimeRange = estimatedEndTimeRange entity,
             fare = fare entity,
+            fareSettlement = fareSettlement entity,
             favCount = favCount entity,
             feedbackSkipped = feedbackSkipped entity,
             fromLocation = fromLocation entity,

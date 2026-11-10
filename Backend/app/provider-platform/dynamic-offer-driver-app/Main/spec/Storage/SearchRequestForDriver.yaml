@@ -1,4 +1,5 @@
 imports:
+  FareSettlement: Domain.Types.FareSettlement
   Merchant: Domain.Types.Merchant
   MerchantOperatingCity: Domain.Types.MerchantOperatingCity
   SearchRequest: Domain.Types.SearchRequest
@@ -122,6 +123,7 @@ SearchRequestForDriver:
     # True when the driver held a live "AvailableForRides" tag at the moment this
     # request was built. Nothing on rows written before the feature existed.
     hasAvailableForRidesTag: Maybe Bool
+    baseFareSettlement: Maybe FareSettlement
 
   beamType:
     clientBundleVersion: Maybe Text
@@ -141,6 +143,7 @@ SearchRequestForDriver:
     clientModelName: Maybe Text
     clientManufacturer: Maybe Text
     conditionalCharges: Maybe Text
+    baseFareSettlement: Maybe Value
 
   beamFields:
     clientDevice:
@@ -191,6 +194,7 @@ SearchRequestForDriver:
     totalRides: Kernel.Prelude.fromMaybe 0 totalRides|E
     conditionalCharges: |-
       Kernel.Prelude.fromMaybe [] $ Kernel.Prelude.readMaybe . Data.Text.unpack =<< conditionalCharges|E
+    baseFareSettlement: Kernel.Utils.JSON.valueToMaybe =<< baseFareSettlement|E
 
   toTType:
     merchantOperatingCityId: Just $ Kernel.Types.Id.getId merchantOperatingCityId|E
@@ -223,6 +227,7 @@ SearchRequestForDriver:
     distanceUnit: Kernel.Prelude.Just|I
     totalRides: Kernel.Prelude.Just|I
     conditionalCharges: Kernel.Prelude.Just $ Kernel.Prelude.show conditionalCharges|E
+    baseFareSettlement: toJSON <$> baseFareSettlement|E
 
   constraints:
     id: PrimaryKey
@@ -267,6 +272,7 @@ SearchRequestForDriver:
     customerTags: json
     driverTagScore: json
     conditionalCharges: text
+    baseFareSettlement: "json"
 
   default:
     rideRequestPopupDelayDuration: 0

@@ -30,6 +30,7 @@ data SearchRequestForDriverT f = SearchRequestForDriverT
     backendConfigVersion :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Text),
     baseFare :: B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.Money),
     baseFareAmount :: B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney),
+    baseFareSettlement :: B.C f (Kernel.Prelude.Maybe Data.Aeson.Value),
     batchNumber :: B.C f Kernel.Prelude.Int,
     batchingMode :: B.C f (Kernel.Prelude.Maybe Domain.Types.DriverPoolConfig.BatchingMode),
     cancellationRatio :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Double),

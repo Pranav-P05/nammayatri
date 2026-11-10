@@ -38,6 +38,8 @@ where
 
 import qualified API.Types.ProviderPlatform.Management.FarePolicyV2 as Common
 import qualified "this" API.Types.ProviderPlatform.Management.Merchant as DPM
+import qualified BecknV2.OnDemand.FareBreakup.Core as FB
+import qualified BecknV2.OnDemand.FareBreakup.Tax as Tax
 import Control.Applicative ((<|>))
 import qualified "lib-dashboard" Dashboard.Common as DCommon
 import qualified Data.Aeson as A
@@ -79,6 +81,7 @@ import Lib.ConfigPilot.Interface.Types (getOneConfig)
 import qualified Lib.Types.SpecialLocation as SL
 import qualified SharedLogic.FareCalculator as SFC
 import SharedLogic.Merchant (findMerchantByShortId)
+import qualified SharedLogic.RideTax as RideTax
 import qualified SharedLogic.SpecialZoneDriverDemand as SpecialZoneDriverDemand
 import qualified Storage.Cac.FarePolicy as CQFP
 import qualified Storage.CachedQueries.CancellationFarePolicy as CQCFP
@@ -401,6 +404,7 @@ postFarePolicyV2Preview merchantShortId opCity req = do
     (Nothing, Nothing) -> throwError (InvalidRequest "either farePolicyId or an inline policy is required")
   let emptyCongestion = FarePolicyD.CongestionChargeDetails Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
       fullFarePolicy = FarePolicyD.farePolicyToFullFarePolicy merchant.id serviceTier tripCategory mbCancellation emptyCongestion Nothing domainPolicy Nothing
+      previewRideTax = RideTax.resolveTaxRates transporterConfig (Just fullFarePolicy) req.paymentChargeDetails
   trips <- forM req.sampleTrips $ \trip -> do
     let params =
           SFC.CalculateFareParametersParams
@@ -408,6 +412,8 @@ postFarePolicyV2Preview merchantShortId opCity req = do
               computationPhase = SFC.FCEstimate,
               mbCapConfig = Nothing,
               mbEstimateFareParams = Nothing,
+              paymentChargeDetails = req.paymentChargeDetails,
+              buyerOfferDiscount = req.discountAmount,
               actualDistance = Just trip.distance,
               rideTime = fromMaybe now trip.rideTime,
               returnTime = Nothing,
@@ -421,6 +427,7 @@ postFarePolicyV2Preview merchantShortId opCity req = do
               negativeFareAdjustment = Nothing,
               nightShiftCharge = Nothing,
               customerCancellationDues = Nothing,
+              customerCancellationDuesTaxBreakup = Nothing,
               nightShiftOverlapChecking = isJust trip.rideTime,
               estimatedDistance = Just trip.distance,
               estimatedRideDuration = Just trip.duration,
@@ -438,23 +445,41 @@ postFarePolicyV2Preview merchantShortId opCity req = do
               negotiatedFareDelta = Nothing,
               shouldApplyBusinessDiscount = False,
               shouldApplyPersonalDiscount = False,
-              merchantOperatingCityId = Just merchantOpCity.id,
+              merchantOperatingCityId = merchantOpCity.id,
               mbAdditonalChargeCategories = Nothing,
               numberOfLuggages = Nothing,
-              govtChargesRate = Just transporterConfig.taxConfig.rideGst,
               pickupGateId = Nothing,
               fareSettlementType = Nothing,
               isParkingFeeExempt = False
             }
     fareParams <- SFC.calculateFareParameters params
-    let totalFare = SFC.fareSum fareParams (Just [])
+    let (totalFare, previewSettlement) = SFC.fareSum SFC.FareChargeRates {currency = fareParams.currency, commissionChargeConfig = fullFarePolicy.commissionChargeConfig, rideTax = Just previewRideTax, paymentChargeDetails = req.paymentChargeDetails, discountAmount = req.discountAmount, cancellationDuesCommission = Nothing, deductedAtPayment = Nothing} fareParams (Just [])
         bounds = (\b -> DDriverExtraFeeBounds.findDriverExtraFeeBoundsByDistance trip.distance b) <$> domainPolicy.driverExtraFeeBounds
         minFee = maybe 0 (.minFee) bounds
         maxFee = maybe 0 (.maxFee) bounds
         pickupSpread = case domainPolicy.farePolicyDetails of
           FarePolicyD.ProgressiveDetails d -> d.pickupCharges.pickupChargesMax - d.pickupCharges.pickupChargesMin
           _ -> 0
-        breakup = SFC.mkFareParamsDisplayBreakups True identity Common.FPV2FareBreakupItem fareParams
+        breakupPairs = SFC.mkFareParamsBreakups True identity (,) fareParams
+        isComponentCharge = FB.isChargeTitle {FB.rideFare = \lineTitle -> not (FB.isTaxTitle lineTitle || or (($ lineTitle) <$> FB.isChargeTitle))}
+        coveredTitles = (\isChargeOf -> [lineTitle | (lineTitle, _) <- breakupPairs, not (FB.isTaxTitle lineTitle), isChargeOf lineTitle]) <$> isComponentCharge
+        taxGroups = toList ((,,) <$> FB.taxTitles <*> fmap (FB.tagTitle . (.tax)) FB.taxTags <*> coveredTitles)
+        toBreakupItem (lineTitle, lineAmount) = case find (\(groupTaxTitles, _, _) -> lineTitle `elem` groupTaxTitles) taxGroups of
+          Nothing -> Common.FPV2FareBreakupItem {title = lineTitle, amount = lineAmount, taxOf = Nothing, partOf = Nothing}
+          Just (_, totalTaxTitle, taxedTitles) -> Common.FPV2FareBreakupItem {title = lineTitle, amount = lineAmount, taxOf = Just taxedTitles, partOf = if lineTitle == totalTaxTitle then Nothing else Just totalTaxTitle}
+        breakup = map toBreakupItem breakupPairs
+        previewNet =
+          Common.FPV2PreviewNet
+            { total = previewSettlement.total,
+              net = previewSettlement.net,
+              taxAdded = previewSettlement.taxAdded,
+              taxDeducted = previewSettlement.taxDeducted,
+              commission = SFC.settlementCommissionTotal previewSettlement,
+              commissionTax = Tax.taxTotal (previewSettlement.commission >>= (.taxBreakup)) + Tax.taxTotal (previewSettlement.cancellationDuesCommission >>= (.taxBreakup)),
+              paymentCharge = maybe 0 (.amount) previewSettlement.paymentCharge,
+              paymentChargeTax = Tax.taxTotal (previewSettlement.paymentCharge >>= (.taxBreakup)),
+              paymentChargeBearer = (.bearer) <$> previewSettlement.paymentCharge
+            }
     pure
       Common.FPV2TripPreview
         { distance = trip.distance,
@@ -462,9 +487,10 @@ postFarePolicyV2Preview merchantShortId opCity req = do
           totalFare = totalFare,
           minFare = totalFare + minFee,
           maxFare = totalFare + maxFee + pickupSpread,
-          breakup = breakup
+          breakup = breakup,
+          net = previewNet
         }
-  pure $ Common.FPV2PreviewRes {trips = trips}
+  pure $ Common.FPV2PreviewRes {trips = trips, appliedTax = Tax.RiderTaxRates {regime = previewRideTax.regime, riderPayable = previewRideTax.riderPayable}}
 
 --------------------------------------------------------------------------------
 -- product create / remove
@@ -987,10 +1013,12 @@ toApiPolicy policy mbCancellation =
       congestionChargeMultiplier = toApiCongestionMultiplier <$> policy.congestionChargeMultiplier,
       perDistanceUnitInsuranceCharge = policy.perDistanceUnitInsuranceCharge,
       cardCharge = (\c -> Common.FPV2CardCharge {perDistanceUnitMultiplier = c.perDistanceUnitMultiplier, fixed = c.fixed}) <$> policy.cardCharge,
-      vatChargeConfig = toApiChargeConfig <$> policy.vatChargeConfig,
       commissionChargeConfig = toApiChargeConfig <$> policy.commissionChargeConfig,
       cancellationCommissionChargeConfig = toApiChargeConfig <$> policy.cancellationCommissionChargeConfig,
-      tollTaxChargeConfig = toApiChargeConfig <$> policy.tollTaxChargeConfig,
+      rideTaxConfig = policy.rideTaxConfig,
+      tollTaxConfig = policy.tollTaxConfig,
+      parkingTaxConfig = policy.parkingTaxConfig,
+      commissionTaxConfig = policy.commissionTaxConfig,
       platformFee = policy.platformFee,
       platformFeeCgst = policy.cgst,
       platformFeeSgst = policy.sgst,
@@ -1159,10 +1187,12 @@ fromApiPolicy ctx mbCancellationId now p = do
         congestionChargeMultiplier = fromApiCongestionMultiplier <$> p.congestionChargeMultiplier,
         perDistanceUnitInsuranceCharge = p.perDistanceUnitInsuranceCharge,
         cardCharge = (\c -> FarePolicyD.CardCharge {perDistanceUnitMultiplier = c.perDistanceUnitMultiplier, fixed = c.fixed}) <$> p.cardCharge,
-        vatChargeConfig = fromApiChargeConfig <$> p.vatChargeConfig,
         commissionChargeConfig = fromApiChargeConfig <$> p.commissionChargeConfig,
         cancellationCommissionChargeConfig = fromApiChargeConfig <$> p.cancellationCommissionChargeConfig,
-        tollTaxChargeConfig = fromApiChargeConfig <$> p.tollTaxChargeConfig,
+        rideTaxConfig = p.rideTaxConfig,
+        tollTaxConfig = p.tollTaxConfig,
+        parkingTaxConfig = p.parkingTaxConfig,
+        commissionTaxConfig = p.commissionTaxConfig,
         farePolicyDetails = details,
         cancellationFarePolicyId = mbCancellationId,
         negotiationFareMinTolerancePct = p.negotiationFareMinTolerancePct,
@@ -1397,7 +1427,8 @@ toApiPlatformFeeInfo p =
         FarePolicyD.ProgressivePlatformFee m -> Common.ProgressivePlatformFee m
         FarePolicyD.ConstantPlatformFee m -> Common.ConstantPlatformFee m,
       cgst = p.cgst,
-      sgst = p.sgst
+      sgst = p.sgst,
+      vat = p.vat
     }
 
 fromApiPlatformFeeInfo :: Common.FPV2PlatformFeeInfo -> FarePolicyD.PlatformFeeInfo
@@ -1407,7 +1438,8 @@ fromApiPlatformFeeInfo p =
         Common.ProgressivePlatformFee m -> FarePolicyD.ProgressivePlatformFee m
         Common.ConstantPlatformFee m -> FarePolicyD.ConstantPlatformFee m,
       cgst = p.cgst,
-      sgst = p.sgst
+      sgst = p.sgst,
+      vat = p.vat
     }
 
 toApiDurationBasis :: DFPC.PerMinRateDurationBasis -> Common.FPV2PerMinRateDurationBasis
@@ -1503,6 +1535,7 @@ toApiChargeComponent = \case
   FarePolicyD.NegotiatedFareDeltaComponent -> Common.NegotiatedFareDeltaComponent
   FarePolicyD.NegativeFareAdjustmentComponent -> Common.NegativeFareAdjustmentComponent
   FarePolicyD.PaymentChargePaidByCustomerComponent -> Common.PaymentChargePaidByCustomerComponent
+  FarePolicyD.PaymentChargePaidByCustomerTaxComponent -> Common.PaymentChargePaidByCustomerTaxComponent
   FarePolicyD.GovtChargesComponent -> Common.GovtChargesComponent
   FarePolicyD.PersonalDiscountComponent -> Common.PersonalDiscountComponent
   FarePolicyD.BusinessDiscountComponent -> Common.BusinessDiscountComponent
@@ -1556,6 +1589,7 @@ fromApiChargeComponent = \case
   Common.NegotiatedFareDeltaComponent -> FarePolicyD.NegotiatedFareDeltaComponent
   Common.NegativeFareAdjustmentComponent -> FarePolicyD.NegativeFareAdjustmentComponent
   Common.PaymentChargePaidByCustomerComponent -> FarePolicyD.PaymentChargePaidByCustomerComponent
+  Common.PaymentChargePaidByCustomerTaxComponent -> FarePolicyD.PaymentChargePaidByCustomerTaxComponent
   Common.GovtChargesComponent -> FarePolicyD.GovtChargesComponent
   Common.PersonalDiscountComponent -> FarePolicyD.PersonalDiscountComponent
   Common.BusinessDiscountComponent -> FarePolicyD.BusinessDiscountComponent

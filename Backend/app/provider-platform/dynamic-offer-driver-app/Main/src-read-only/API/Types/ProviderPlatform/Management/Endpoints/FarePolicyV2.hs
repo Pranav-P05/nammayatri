@@ -3,10 +3,13 @@
 
 module API.Types.ProviderPlatform.Management.Endpoints.FarePolicyV2 where
 
+import qualified BecknV2.OnDemand.FareBreakup.Tax
+import qualified BecknV2.OnDemand.PaymentCharge
 import qualified Dashboard.Common
 import Data.Aeson
 import Data.OpenApi (ToSchema)
 import qualified Data.Singletons.TH
+import qualified Domain.Types.PaymentChargeBearer
 import EulerHS.Prelude hiding (id, state)
 import qualified EulerHS.Types
 import qualified Kernel.Prelude
@@ -174,7 +177,12 @@ data FPV2DriverExtraFeeBounds = FPV2DriverExtraFeeBounds
   deriving stock (Generic)
   deriving anyclass (ToJSON, FromJSON, ToSchema)
 
-data FPV2FareBreakupItem = FPV2FareBreakupItem {title :: Kernel.Prelude.Text, amount :: Kernel.Types.Common.HighPrecMoney}
+data FPV2FareBreakupItem = FPV2FareBreakupItem
+  { title :: Kernel.Prelude.Text,
+    amount :: Kernel.Types.Common.HighPrecMoney,
+    taxOf :: Kernel.Prelude.Maybe [Kernel.Prelude.Text],
+    partOf :: Kernel.Prelude.Maybe Kernel.Prelude.Text
+  }
   deriving stock (Generic)
   deriving anyclass (ToJSON, FromJSON, ToSchema)
 
@@ -226,6 +234,7 @@ data FPV2FareChargeComponent
   | NegotiatedFareDeltaComponent
   | NegativeFareAdjustmentComponent
   | PaymentChargePaidByCustomerComponent
+  | PaymentChargePaidByCustomerTaxComponent
   | GovtChargesComponent
   | PersonalDiscountComponent
   | BusinessDiscountComponent
@@ -312,7 +321,7 @@ data FPV2PlatformFeeCharge
   deriving stock (Generic)
   deriving anyclass (ToJSON, FromJSON, ToSchema)
 
-data FPV2PlatformFeeInfo = FPV2PlatformFeeInfo {platformFeeCharge :: FPV2PlatformFeeCharge, cgst :: Kernel.Prelude.Double, sgst :: Kernel.Prelude.Double}
+data FPV2PlatformFeeInfo = FPV2PlatformFeeInfo {platformFeeCharge :: FPV2PlatformFeeCharge, cgst :: Kernel.Prelude.Double, sgst :: Kernel.Prelude.Double, vat :: Kernel.Prelude.Maybe Kernel.Prelude.Double}
   deriving stock (Generic)
   deriving anyclass (ToJSON, FromJSON, ToSchema)
 
@@ -352,10 +361,12 @@ data FPV2Policy = FPV2Policy
     congestionChargeMultiplier :: Kernel.Prelude.Maybe FPV2CongestionChargeMultiplier,
     perDistanceUnitInsuranceCharge :: Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney,
     cardCharge :: Kernel.Prelude.Maybe FPV2CardCharge,
-    vatChargeConfig :: Kernel.Prelude.Maybe FPV2FareChargeConfig,
     commissionChargeConfig :: Kernel.Prelude.Maybe FPV2FareChargeConfig,
     cancellationCommissionChargeConfig :: Kernel.Prelude.Maybe FPV2FareChargeConfig,
-    tollTaxChargeConfig :: Kernel.Prelude.Maybe FPV2FareChargeConfig,
+    rideTaxConfig :: Kernel.Prelude.Maybe BecknV2.OnDemand.FareBreakup.Tax.TaxConfig,
+    tollTaxConfig :: Kernel.Prelude.Maybe BecknV2.OnDemand.FareBreakup.Tax.TaxConfig,
+    parkingTaxConfig :: Kernel.Prelude.Maybe BecknV2.OnDemand.FareBreakup.Tax.TaxConfig,
+    commissionTaxConfig :: Kernel.Prelude.Maybe BecknV2.OnDemand.FareBreakup.Tax.TaxConfig,
     platformFee :: Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney,
     platformFeeCgst :: Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney,
     platformFeeSgst :: Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney,
@@ -392,12 +403,28 @@ data FPV2PolicySummary = FPV2PolicySummary
   deriving stock (Generic)
   deriving anyclass (ToJSON, FromJSON, ToSchema)
 
+data FPV2PreviewNet = FPV2PreviewNet
+  { total :: Kernel.Types.Common.HighPrecMoney,
+    net :: Kernel.Types.Common.HighPrecMoney,
+    taxAdded :: Kernel.Types.Common.HighPrecMoney,
+    taxDeducted :: Kernel.Types.Common.HighPrecMoney,
+    commission :: Kernel.Types.Common.HighPrecMoney,
+    commissionTax :: Kernel.Types.Common.HighPrecMoney,
+    paymentCharge :: Kernel.Types.Common.HighPrecMoney,
+    paymentChargeTax :: Kernel.Types.Common.HighPrecMoney,
+    paymentChargeBearer :: Kernel.Prelude.Maybe Domain.Types.PaymentChargeBearer.PaymentChargeBearer
+  }
+  deriving stock (Generic)
+  deriving anyclass (ToJSON, FromJSON, ToSchema)
+
 data FPV2PreviewReq = FPV2PreviewReq
   { farePolicyId :: Kernel.Prelude.Maybe (Kernel.Types.Id.Id Dashboard.Common.FarePolicy),
     policy :: Kernel.Prelude.Maybe FPV2Policy,
     serviceTier :: Kernel.Prelude.Maybe Dashboard.Common.ServiceTierType,
     tripCategory :: Kernel.Prelude.Maybe Dashboard.Common.TripCategory,
-    sampleTrips :: [FPV2SampleTrip]
+    sampleTrips :: [FPV2SampleTrip],
+    paymentChargeDetails :: Kernel.Prelude.Maybe BecknV2.OnDemand.PaymentCharge.PaymentChargeDetails,
+    discountAmount :: Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney
   }
   deriving stock (Generic)
   deriving anyclass (ToJSON, FromJSON, ToSchema)
@@ -405,7 +432,7 @@ data FPV2PreviewReq = FPV2PreviewReq
 instance Kernel.Types.HideSecrets.HideSecrets FPV2PreviewReq where
   hideSecrets = Kernel.Prelude.identity
 
-data FPV2PreviewRes = FPV2PreviewRes {trips :: [FPV2TripPreview]}
+data FPV2PreviewRes = FPV2PreviewRes {trips :: [FPV2TripPreview], appliedTax :: BecknV2.OnDemand.FareBreakup.Tax.RiderTaxRates}
   deriving stock (Generic)
   deriving anyclass (ToJSON, FromJSON, ToSchema)
 
@@ -565,7 +592,8 @@ data FPV2TripPreview = FPV2TripPreview
     totalFare :: Kernel.Types.Common.HighPrecMoney,
     minFare :: Kernel.Types.Common.HighPrecMoney,
     maxFare :: Kernel.Types.Common.HighPrecMoney,
-    breakup :: [FPV2FareBreakupItem]
+    breakup :: [FPV2FareBreakupItem],
+    net :: FPV2PreviewNet
   }
   deriving stock (Generic)
   deriving anyclass (ToJSON, FromJSON, ToSchema)

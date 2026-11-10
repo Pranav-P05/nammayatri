@@ -229,6 +229,8 @@ data AccountRole
   | PGPayoutExpense
   | PGPayoutLiability
   | PGGstAsset
+  | OwnerAsset
+  | DuesClearing
   deriving (Eq, Show, Generic)
 
 -- | The FinanceM monad transformer.
@@ -305,6 +307,26 @@ account role = do
 -- | Internal: map an AccountRole to an AccountInput using context.
 roleToInput :: FinanceCtx -> AccountRole -> AccountInput
 roleToInput ctx = \case
+  OwnerAsset ->
+    AccountInput
+      { accountType = Asset,
+        counterpartyType = Just ctx.counterpartyType,
+        counterpartyId = Just ctx.counterpartyId,
+        subLedger = Nothing,
+        currency = ctx.currency,
+        merchantId = ctx.merchantId,
+        merchantOperatingCityId = ctx.merchantOpCityId
+      }
+  DuesClearing ->
+    AccountInput
+      { accountType = Liability,
+        counterpartyType = Just BUYER,
+        counterpartyId = Just (fromMaybe ctx.merchantId ctx.buyerCounterpartyId),
+        subLedger = Nothing,
+        currency = ctx.currency,
+        merchantId = ctx.merchantId,
+        merchantOperatingCityId = ctx.merchantOpCityId
+      }
   BuyerAsset ->
     AccountInput
       { accountType = Asset,

@@ -22,6 +22,8 @@ import qualified Beckn.ACL.Common as Common
 import qualified Beckn.OnDemand.Utils.Common as BUtils
 import qualified Beckn.OnDemand.Utils.OndcScheduledRide.Common as OSRCommon
 import qualified BecknV2.OnDemand.Enums as Enums
+import qualified BecknV2.OnDemand.FareBreakup.Core as FB
+import BecknV2.OnDemand.FareBreakup.Tax (mkTaxBreakup)
 import qualified BecknV2.OnDemand.Tags as Tags
 import qualified BecknV2.OnDemand.Types as Spec
 import qualified BecknV2.OnDemand.Utils.Common as Utils
@@ -51,6 +53,7 @@ import Kernel.Types.Error
 import Kernel.Types.Id
 import Kernel.Utils.Common hiding (mkPrice)
 import qualified Kernel.Utils.Common as Common (mkPrice)
+import qualified SharedLogic.CancellationConsequence as CancellationConsequence
 import SharedLogic.FareCalculator
 import qualified SharedLogic.FarePolicy as SFP
 import SharedLogic.MerchantPaymentMethod (resolveBookingPaymentMethodInfo)
@@ -100,7 +103,7 @@ buildOnCancelMessageV2 merchant mbBapCity mbBapCountry cancelStatus (OC.BookingC
     if isNothing mbCancellationDuesDetails && cancelStatus == show Enums.SOFT_CANCEL
       then maybe (pure Nothing) (QCCM.findByPrimaryKey . Id) (mbRide' >>= (.cancellationConsequenceRowIdIfCancelled))
       else pure Nothing
-  let mbCollectionMode = (mbCancellationDuesDetails >>= (.cancellationCollectionMode)) <|> (show <$> (mbSoftCancelRow >>= (.collectionMode)))
+  let mbCollectionMode = (mbCancellationDuesDetails >>= (.cancellationCollectionMode)) <|> (show . CancellationConsequence.collectionModeOf <$> mbSoftCancelRow)
   riderDetails <- runInReplica $ QRiderDetails.findById riderId >>= fromMaybeM (RiderDetailsNotFound riderId.getId)
   customerPhoneNo <- decrypt riderDetails.mobileNumber
   let vehicleCategory = Utils.mapServiceTierToCategory booking.vehicleServiceTier
@@ -232,14 +235,8 @@ mkQuotationBreakup booking mbCancellationDuesDetails' =
   Just $
     case mbCancellationDuesDetails' of
       Just cancellationDuesDetails ->
-        mkProjectFareParamsTagBreakupItemsForCancellation
-          mkPrice
-          mkQuotationBreakupInner
-          (fromMaybe 0 cancellationDuesDetails.cancellationFee)
-          (fromMaybe 0 cancellationDuesDetails.cancellationFeeTax)
-          <> [ mkQuotationBreakupInner (show Enums.RIDE_CANCELLATION_CHARGES) (mkPrice (fromMaybe 0 cancellationDuesDetails.cancellationFee)),
-               mkQuotationBreakupInner (show Enums.RIDE_CANCELLATION_TAX) (mkPrice (fromMaybe 0 cancellationDuesDetails.cancellationFeeTax))
-             ]
+        mkQuotationBreakupInner (show Enums.RIDE_CANCELLATION_CHARGES) (mkPrice (fromMaybe 0 cancellationDuesDetails.cancellationFee)) :
+        map (\(title, amount) -> mkQuotationBreakupInner title (mkPrice amount)) (componentTaxLines ((.cancellationFee) FB.taxTags) (cancellationDuesDetails.cancellationFeeTaxBreakup <|> mkTaxBreakup cancellationDuesDetails.cancellationFeeTax Nothing Nothing Nothing))
       Nothing -> []
   where
     mkPrice money =
@@ -271,7 +268,7 @@ tfItems booking merchant mbFarePolicy =
           Spec.itemCategoryIds = Just [BUtils.tripCategoryToCategoryCode booking.tripCategory],
           Spec.itemPaymentIds = tfPaymentId booking.paymentId,
           Spec.itemPrice = tfItemPrice booking,
-          Spec.itemTags = BUtils.mkRateCardTag Nothing booking.fareParams.customerCancellationDues Nothing booking.estimatedFare booking.fareParams.congestionChargeViaDp (Just . FarePolicyD.fullFarePolicyToFarePolicy =<< mbFarePolicy) Nothing Nothing Nothing Nothing (not $ null booking.stops)
+          Spec.itemTags = BUtils.mkRateCardTag Nothing booking.fareParams.customerCancellationDues Nothing booking.estimatedFare booking.fareParams.congestionChargeViaDp (Just . FarePolicyD.fullFarePolicyToFarePolicy =<< mbFarePolicy) Nothing Nothing Nothing (not $ null booking.stops)
         }
     ]
 

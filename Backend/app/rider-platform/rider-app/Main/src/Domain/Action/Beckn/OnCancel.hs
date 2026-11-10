@@ -90,7 +90,7 @@ onCancel ValidatedBookingCancelledReq {..} = do
   whenJust booking.bookingDepositAmount $ \_ ->
     void . withTryCatch "onCancel:reconcileDeposit" $ DPaymentAction.reconcileDepositPayment True booking
   abandonedPayScreen <- BookingDeposit.isUnpaidDepositAbandon booking castedCancellationSource
-  Common.cancellationTransaction booking mbRide castedCancellationSource cancellationFee cancellationFeeTax immediateCharge
+  Common.cancellationTransaction booking mbRide castedCancellationSource cancellationFee cancellationFeeTax immediateCharge (resolveBapCollectsFee riderConfig collectionMode)
   -- rider push for the cancellation consequence, keyed by the matrix row's notification key
   unless abandonedPayScreen $
     whenJust customerCancellationNotificationKey $ \pnKey ->
@@ -141,10 +141,18 @@ resolveImmediateCapture riderConfig collectionMode cancellationSource =
     -- on_cancel order tags) — it is authoritative when present.
     Just "ImmediateCapture" -> True
     Just "NextRideDues" -> False
+    Just "PayBeforeNextRide" -> False
     -- Old BPP (no mode on the wire): legacy rider-config flags decide.
     _ -> case cancellationSource of
       SBCR.ByUser -> fromMaybe True riderConfig.immediateCaptureRiderCancellationFee
       _ -> fromMaybe True riderConfig.immediateCaptureDriverCancellationFee
+
+resolveBapCollectsFee :: DRC.RiderConfig -> Maybe Text -> Bool
+resolveBapCollectsFee riderConfig collectionMode = case collectionMode of
+  Just "ImmediateCapture" -> True
+  Just "PayBeforeNextRide" -> True
+  Just "NextRideDues" -> False
+  _ -> riderConfig.settleCancellationFeeBeforeNextRide == Just True
 
 validateRequest ::
   ( CacheFlow m r,

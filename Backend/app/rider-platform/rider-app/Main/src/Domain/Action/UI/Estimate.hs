@@ -15,11 +15,13 @@
 module Domain.Action.UI.Estimate where
 
 import qualified BecknV2.OnDemand.Enums as Enums
+import qualified BecknV2.OnDemand.FareBreakup.Core as FB
+import qualified BecknV2.OnDemand.Tags as Tags
 import Data.Aeson
-import Domain.SharedLogic.RideDiscount (isProjectedFareParamTag)
 import Domain.Types.BppDetails
 import Domain.Types.Estimate
 import Domain.Types.EstimateStatus
+import Domain.Types.FareBreakupInfo (FareBreakupInfoItem)
 import qualified Domain.Types.ServiceTierType as DVST
 import Domain.Types.Trip (TripCategory)
 import qualified Domain.Types.VehicleVariant as Vehicle
@@ -28,7 +30,9 @@ import Kernel.Prelude
 import Kernel.Types.Common
 import Kernel.Types.Id
 import Kernel.Utils.Common
+import qualified SharedLogic.FareBreakupLines as FBL
 import qualified SharedLogic.Offer as SOffer
+import qualified SharedLogic.PaymentCharge as SPaymentCharge
 
 data EstimateAPIEntity = EstimateAPIEntity
   { id :: Id Estimate,
@@ -83,7 +87,16 @@ data EstimateAPIEntity = EstimateAPIEntity
     insuredAmount :: Maybe Text,
     offer :: Maybe SOffer.CumulativeOfferResp,
     area :: Maybe Text,
-    navigationInstruction :: Maybe Text
+    navigationInstruction :: Maybe Text,
+    optionalCharges :: OptionalChargesAPIEntity
+  }
+  deriving (Generic, Show, ToJSON, FromJSON, ToSchema)
+
+data OptionalChargesAPIEntity = OptionalChargesAPIEntity
+  { petCharges :: Maybe HighPrecMoney,
+    perStopCharge :: Maybe HighPrecMoney,
+    perLuggageCharge :: Maybe HighPrecMoney,
+    safetyPlusCharge :: Maybe HighPrecMoney
   }
   deriving (Generic, Show, ToJSON, FromJSON, ToSchema)
 
@@ -105,17 +118,46 @@ data EstimateBreakupAPIEntity = EstimateBreakupAPIEntity
 -- Use this when the caller has a preloaded provider lookup so per-estimate
 -- Redis hits (CQBppDetails.findBySubscriberIdAndDomain + QNP.isValueAddNP)
 -- can be skipped.
-mkEstimateAPIEntity :: (CacheFlow m r, EsqDBFlow m r, MonadFlow m) => Bool -> Maybe SOffer.CumulativeOfferResp -> BppDetails -> Bool -> Estimate -> m EstimateAPIEntity
-mkEstimateAPIEntity isReferredRide offer bppDetails valueAddNPRes (Estimate {..}) = do
+mkEstimateAPIEntity :: (CacheFlow m r, EsqDBFlow m r, MonadFlow m) => Bool -> Maybe SOffer.CumulativeOfferResp -> Maybe SPaymentCharge.PaymentChargeDetails -> Maybe [FareBreakupInfoItem] -> BppDetails -> Bool -> Estimate -> m EstimateAPIEntity
+mkEstimateAPIEntity isReferredRide mbOffer mbPaymentCharge mbFareBreakups bppDetails valueAddNPRes (Estimate {..}) = do
   let mbBaseFareEB = find (\x -> x.title == show Enums.BASE_FARE) estimateBreakupList
       mbBaseDistanceFareEB = maybeToList $ addBaseDisatanceFareEB mbBaseFareEB -- TODO::Remove it after UI stops consuming it,
+      currency = estimatedFare.currency
+      fareLines = maybe [] (.breakupLines) (FBL.fareLinesFromRateCard estimatedFare.amount mbFareBreakups [(breakup.title, breakup.price.value.amount) | breakup <- estimateBreakupList])
+      grossOfFare fare = SPaymentCharge.grossFromLines currency mbPaymentCharge fare.amount (linesFor fare.amount)
+      linesFor fareAmount
+        | fareAmount == estimatedFare.amount = fareLines
+        | estimatedFare.amount > 0 = [FB.BreakupLine {title = line.title, amount = line.amount * fareAmount / estimatedFare.amount} | line <- fareLines]
+        | otherwise = []
+      grossFare = grossOfFare estimatedFare
+      grossTotalFare = grossOfFare estimatedTotalFare
+      grossMinFare = grossOfFare totalFareRange.minFare
+      grossMaxFare = grossOfFare totalFareRange.maxFare
+      offer = SOffer.withPostOfferGross currency mbPaymentCharge <$> mbOffer
+      chargeGrossOf = roundAmountByCurrency' currency . SPaymentCharge.mkChargeGross currency riderTaxRates mbPaymentCharge
+      breakupAmount breakupTitle = (\breakup -> breakup.price.value.amount) <$> find (\breakup -> breakup.title == breakupTitle) estimateBreakupList
+      petCharge = chargeGrossOf <$> breakupAmount (show Tags.PET_CHARGES)
+      perStop = chargeGrossOf <$> breakupAmount (show Tags.PER_STOP_CHARGES)
+      perLuggage = chargeGrossOf <$> breakupAmount (show Tags.LUGGAGE_CHARGE)
+      safetyPlus = chargeGrossOf <$> breakupAmount (show Enums.SAFETY_PLUS_CHARGES)
+      tipGross = map (chargeGrossOf . fromIntegral) <$> tipOptions
+      smartTipGross = chargeGrossOf <$> smartTipSuggestion
+      waitingGross = chargeGrossOf . (.amount) <$> waitingCharges.waitingChargePerMin
+      estimateOptionalCharges =
+        OptionalChargesAPIEntity
+          { petCharges = petCharge,
+            perStopCharge = perStop,
+            perLuggageCharge = perLuggage,
+            safetyPlusCharge = safetyPlus
+          }
+      grossPrice amount = mkPrice (Just currency) (roundAmountByCurrency' currency amount)
   return
     EstimateAPIEntity
       { agencyName = providerName,
         agencyNumber = providerMobileNumber,
         agencyCompletedRidesCount = providerCompletedRidesCount,
         tripTerms = [],
-        estimateFareBreakup = filter (not . isProjectedFareParamTag . (.title)) (mkEstimateBreakupAPIEntity <$> (estimateBreakupList <> mbBaseDistanceFareEB)),
+        estimateFareBreakup = (mkEstimateBreakupAPIEntity <$> (FB.withoutHiddenLines (.title) estimateBreakupList <> mbBaseDistanceFareEB)),
         driversLatLong = driversLocation,
         nightShiftRate = mkNightShiftRateAPIEntity <$> nightShiftInfo,
         providerId = providerId,
@@ -123,22 +165,25 @@ mkEstimateAPIEntity isReferredRide offer bppDetails valueAddNPRes (Estimate {..}
         providerLogoUrl = bppDetails.logoUrl,
         providerDescription = bppDetails.description,
         isValueAddNP = valueAddNPRes,
-        estimatedFare = estimatedFare.amountInt,
-        estimatedTotalFare = estimatedTotalFare.amountInt,
+        estimatedFare = (grossPrice grossFare).amountInt,
+        estimatedTotalFare = (grossPrice grossTotalFare).amountInt,
         discount = discount <&> (.amountInt),
-        estimatedFareWithCurrency = mkPriceAPIEntity estimatedFare,
-        estimatedTotalFareWithCurrency = mkPriceAPIEntity estimatedTotalFare,
-        discountWithCurrency = mkPriceAPIEntity <$> discount,
+        estimatedFareWithCurrency = mkPriceAPIEntity (grossPrice grossFare),
+        estimatedTotalFareWithCurrency = mkPriceAPIEntity (grossPrice grossTotalFare),
+        tipOptions = map roundToIntegral <$> tipGross,
+        smartTipSuggestion = smartTipGross,
+        discountWithCurrency = mkRoundedPriceAPIEntity <$> discount,
         nightShiftInfo = mkNightShiftInfoAPIEntity <$> nightShiftInfo,
         businessDiscountInfo = mkBusinessDiscountInfoAPIEntity <$> businessDiscountInfo,
         personalDiscountInfo = mkPersonalDiscountInfoAPIEntity <$> personalDiscountInfo,
         tollChargesInfo = mkTollChargesInfoAPIEntity <$> tollChargesInfo,
-        waitingCharges = mkWaitingChargesAPIEntity waitingCharges,
-        totalFareRange = mkFareRangeAPIEntity totalFareRange,
+        waitingCharges = mkWaitingChargesAPIEntity currency waitingGross,
+        totalFareRange = mkFareRangeAPIEntity FareRange {minFare = grossPrice grossMinFare, maxFare = grossPrice grossMaxFare},
         vehicleVariant = Vehicle.castServiceTierToVariant vehicleServiceTierType,
         serviceTierType = vehicleServiceTierType,
         vehicleIconUrl = showBaseUrl <$> vehicleIconUrl,
         isInsured = Just isInsured,
+        optionalCharges = estimateOptionalCharges,
         ..
       }
   where
@@ -157,7 +202,7 @@ mkEstimateBreakupAPIEntity EstimateBreakup {..} = do
   EstimateBreakupAPIEntity
     { title = title,
       price = price.value.amountInt,
-      priceWithCurrency = mkPriceAPIEntity price.value
+      priceWithCurrency = mkRoundedPriceAPIEntity price.value
     }
 
 data TollChargesInfoAPIEntity = TollChargesInfoAPIEntity
@@ -196,17 +241,17 @@ data PersonalDiscountInfoAPIEntity = PersonalDiscountInfoAPIEntity
 
 mkBusinessDiscountInfoAPIEntity :: BusinessDiscountInfo -> BusinessDiscountInfoAPIEntity
 mkBusinessDiscountInfoAPIEntity BusinessDiscountInfo {..} = do
-  let businessDiscountWithCurrency = mkPriceAPIEntity businessDiscount
+  let businessDiscountWithCurrency = mkRoundedPriceAPIEntity businessDiscount
   BusinessDiscountInfoAPIEntity {businessDiscount = businessDiscount.amountInt, ..}
 
 mkPersonalDiscountInfoAPIEntity :: PersonalDiscountInfo -> PersonalDiscountInfoAPIEntity
 mkPersonalDiscountInfoAPIEntity PersonalDiscountInfo {..} = do
-  let personalDiscountWithCurrency = mkPriceAPIEntity personalDiscount
+  let personalDiscountWithCurrency = mkRoundedPriceAPIEntity personalDiscount
   PersonalDiscountInfoAPIEntity {personalDiscount = personalDiscount.amountInt, ..}
 
 mkNightShiftInfoAPIEntity :: NightShiftInfo -> NightShiftInfoAPIEntity
 mkNightShiftInfoAPIEntity NightShiftInfo {..} = do
-  let nightShiftChargeWithCurrency = mkPriceAPIEntity nightShiftCharge
+  let nightShiftChargeWithCurrency = mkRoundedPriceAPIEntity nightShiftCharge
   NightShiftInfoAPIEntity {nightShiftCharge = nightShiftCharge.amountInt, ..}
 
 data WaitingChargesAPIEntity = WaitingChargesAPIEntity
@@ -215,11 +260,11 @@ data WaitingChargesAPIEntity = WaitingChargesAPIEntity
   }
   deriving (Generic, Show, ToJSON, FromJSON, ToSchema)
 
-mkWaitingChargesAPIEntity :: WaitingCharges -> WaitingChargesAPIEntity
-mkWaitingChargesAPIEntity WaitingCharges {waitingChargePerMin} =
+mkWaitingChargesAPIEntity :: Currency -> Maybe HighPrecMoney -> WaitingChargesAPIEntity
+mkWaitingChargesAPIEntity currency mbWaitingChargePerMin =
   WaitingChargesAPIEntity
-    { waitingChargePerMin = waitingChargePerMin <&> (.amount),
-      waitingChargePerMinWithCurrency = mkPriceAPIEntity <$> waitingChargePerMin
+    { waitingChargePerMin = mbWaitingChargePerMin,
+      waitingChargePerMinWithCurrency = mkPriceAPIEntity . mkPrice (Just currency) <$> mbWaitingChargePerMin
     }
 
 data FareRangeAPIEntity = FareRangeAPIEntity

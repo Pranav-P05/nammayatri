@@ -3,6 +3,7 @@
 
 module Storage.Beam.BookingUpdateRequest where
 
+import qualified Data.Aeson
 import qualified Database.Beam as B
 import qualified Domain.Types.BookingUpdateRequest
 import Domain.Types.Common ()
@@ -23,6 +24,7 @@ data BookingUpdateRequestT f = BookingUpdateRequestT
     estimatedDistance :: B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMeters),
     estimatedDuration :: B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.Seconds),
     estimatedFare :: B.C f Kernel.Types.Common.HighPrecMoney,
+    estimatedFareSettlement :: B.C f (Kernel.Prelude.Maybe Data.Aeson.Value),
     estimatedStaticDuration :: B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.Seconds),
     fareParamsId :: B.C f Kernel.Prelude.Text,
     farePolicyId :: B.C f Kernel.Prelude.Text,

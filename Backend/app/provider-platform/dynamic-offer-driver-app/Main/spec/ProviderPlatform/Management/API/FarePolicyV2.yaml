@@ -10,6 +10,10 @@ imports:
   DistanceUnit: Kernel.Types.Common
   Months: Kernel.Types.Time
   TimeBound: Kernel.Types.TimeBound
+  TaxConfig: BecknV2.OnDemand.FareBreakup.Tax
+  RiderTaxRates: BecknV2.OnDemand.FareBreakup.Tax
+  PaymentChargeDetails: BecknV2.OnDemand.PaymentCharge
+  PaymentChargeBearer: Domain.Types.PaymentChargeBearer
   Area: Lib.Types.SpecialLocation
   IndianState: Kernel.Types.Beckn.Context
   TripCategory: Dashboard.Common
@@ -194,7 +198,7 @@ types:
     - perDistanceUnitMultiplier: Maybe Double
     - fixed: Maybe HighPrecMoney
   FPV2FareChargeComponent:
-    - enum: "RideFare, WaitingCharge, ServiceChargeComponent, TollChargesComponent, CongestionChargeComponent, ParkingChargeComponent, PetChargeComponent, PriorityChargeComponent, NightShiftChargeComponent, InsuranceChargeComponent, StopChargeComponent, LuggageChargeComponent, PlatformFeeComponent, CustomerCancellationChargeComponent, CustomerExtraFeeComponent, AddOnChargeComponent, DeadKmFareComponent, ExtraKmFareComponent, RideDurationFareComponent, TimeBasedFareComponent, DistBasedFareComponent, TimeFareComponent, DistanceFareComponent, PickupChargeComponent, ExtraDistanceFareComponent, ExtraTimeFareComponent, StateEntryPermitChargesComponent, AmbulanceDistBasedFareComponent, RideVatComponent, TollVatComponent, DriverAllowanceComponent, AirportConvenienceFeeComponent, ReturnFeeChargeComponent, BoothChargeComponent, RideExtraTimeFareComponent, SchedulingChargeComponent, SgstComponent, CgstComponent, ParkingTaxComponent, CardChargeOnFareComponent, CardChargeFixedComponent, ConditionalChargesComponent, CustomerGateFeeComponent, DriverSelectedFareComponent, NegotiatedFareDeltaComponent, NegativeFareAdjustmentComponent, PaymentChargePaidByCustomerComponent, GovtChargesComponent, PersonalDiscountComponent, BusinessDiscountComponent"
+    - enum: "RideFare, WaitingCharge, ServiceChargeComponent, TollChargesComponent, CongestionChargeComponent, ParkingChargeComponent, PetChargeComponent, PriorityChargeComponent, NightShiftChargeComponent, InsuranceChargeComponent, StopChargeComponent, LuggageChargeComponent, PlatformFeeComponent, CustomerCancellationChargeComponent, CustomerExtraFeeComponent, AddOnChargeComponent, DeadKmFareComponent, ExtraKmFareComponent, RideDurationFareComponent, TimeBasedFareComponent, DistBasedFareComponent, TimeFareComponent, DistanceFareComponent, PickupChargeComponent, ExtraDistanceFareComponent, ExtraTimeFareComponent, StateEntryPermitChargesComponent, AmbulanceDistBasedFareComponent, RideVatComponent, TollVatComponent, DriverAllowanceComponent, AirportConvenienceFeeComponent, ReturnFeeChargeComponent, BoothChargeComponent, RideExtraTimeFareComponent, SchedulingChargeComponent, SgstComponent, CgstComponent, ParkingTaxComponent, CardChargeOnFareComponent, CardChargeFixedComponent, ConditionalChargesComponent, CustomerGateFeeComponent, DriverSelectedFareComponent, NegotiatedFareDeltaComponent, NegativeFareAdjustmentComponent, PaymentChargePaidByCustomerComponent, PaymentChargePaidByCustomerTaxComponent, GovtChargesComponent, PersonalDiscountComponent, BusinessDiscountComponent"
   FPV2FareChargeConfig:
     - value: Text
     - appliesOn: "[FPV2FareChargeComponent]"
@@ -217,6 +221,7 @@ types:
     - platformFeeCharge: FPV2PlatformFeeCharge
     - cgst: Double
     - sgst: Double
+    - vat: Maybe Double
   FPV2CancellationFarePolicy:
     - description: Text
     - freeCancellationTimeSeconds: Seconds
@@ -343,10 +348,12 @@ types:
     - congestionChargeMultiplier: Maybe FPV2CongestionChargeMultiplier
     - perDistanceUnitInsuranceCharge: Maybe HighPrecMoney
     - cardCharge: Maybe FPV2CardCharge
-    - vatChargeConfig: Maybe FPV2FareChargeConfig
     - commissionChargeConfig: Maybe FPV2FareChargeConfig
     - cancellationCommissionChargeConfig: Maybe FPV2FareChargeConfig
-    - tollTaxChargeConfig: Maybe FPV2FareChargeConfig
+    - rideTaxConfig: Maybe TaxConfig
+    - tollTaxConfig: Maybe TaxConfig
+    - parkingTaxConfig: Maybe TaxConfig
+    - commissionTaxConfig: Maybe TaxConfig
     - platformFee: Maybe HighPrecMoney
     - platformFeeCgst: Maybe HighPrecMoney
     - platformFeeSgst: Maybe HighPrecMoney
@@ -437,10 +444,24 @@ types:
     - serviceTier: Maybe ServiceTierType
     - tripCategory: Maybe TripCategory
     - sampleTrips: "[FPV2SampleTrip]"
+    - paymentChargeDetails: Maybe PaymentChargeDetails
+    - discountAmount: Maybe HighPrecMoney
     - derive: "'HideSecrets"
   FPV2FareBreakupItem:
     - title: Text
     - amount: HighPrecMoney
+    - taxOf: Maybe [Text]
+    - partOf: Maybe Text
+  FPV2PreviewNet:
+    - total: HighPrecMoney
+    - net: HighPrecMoney
+    - taxAdded: HighPrecMoney
+    - taxDeducted: HighPrecMoney
+    - commission: HighPrecMoney
+    - commissionTax: HighPrecMoney
+    - paymentCharge: HighPrecMoney
+    - paymentChargeTax: HighPrecMoney
+    - paymentChargeBearer: Maybe PaymentChargeBearer
   FPV2TripPreview:
     - distance: Meters
     - duration: Seconds
@@ -448,8 +469,10 @@ types:
     - minFare: HighPrecMoney
     - maxFare: HighPrecMoney
     - breakup: "[FPV2FareBreakupItem]"
+    - net: FPV2PreviewNet
   FPV2PreviewRes:
     - trips: "[FPV2TripPreview]"
+    - appliedTax: RiderTaxRates
 
   # ── create / remove combo ──
   FPV2CreateProductReq:

@@ -61,6 +61,8 @@ import qualified SharedLogic.Booking as SBooking
 import SharedLogic.CallBAPInternal
 import SharedLogic.DriverPool hiding (getDriverPoolConfig)
 import qualified SharedLogic.External.LocationTrackingService.Types as LT
+import qualified SharedLogic.FareCalculator as FC
+import qualified SharedLogic.FarePolicy as SFP
 import SharedLogic.GoogleTranslate (TranslateFlow)
 import SharedLogic.MerchantPaymentMethod (mkPaymentMethodInfo)
 import SharedLogic.ScheduledRideTopDrivers (topDriversRoundCutoff)
@@ -129,6 +131,7 @@ buildDriversExhaustedMarker searchReq searchTry batchNumber = do
         totalRides = 0,
         customerCancellationDues = 0,
         baseFare = Nothing,
+        baseFareSettlement = Nothing,
         commissionCharges = Nothing,
         driverMinExtraFee = Nothing,
         driverMaxExtraFee = Nothing,
@@ -292,7 +295,10 @@ processSendSearchRequestJobWithMode dispatchMode jobId jobData = withLogTag ("Jo
               let mbDriverExtraFeeBounds = ((,) <$> searchReq.estimatedDistance <*> (join $ (.driverExtraFeeBounds) <$> quote.farePolicy)) <&> \(dist, driverExtraFeeBounds) -> DFP.findDriverExtraFeeBoundsByDistance dist driverExtraFeeBounds
                   driverPickUpCharge = join $ USRD.extractDriverPickupCharges <$> ((.farePolicyDetails) <$> quote.farePolicy)
                   driverParkingCharge = join $ (.parkingCharge) <$> quote.farePolicy
-              SST.buildTripQuoteDetail searchReq quote.tripCategory quote.vehicleServiceTier quote.vehicleServiceTierName (quote.estimatedFare + fromMaybe 0 searchTry.customerExtraFee + fromMaybe 0 searchTry.petCharges) Nothing (mbDriverExtraFeeBounds <&> (.minFee)) (mbDriverExtraFeeBounds <&> (.maxFee)) (mbDriverExtraFeeBounds <&> (.stepFee)) (mbDriverExtraFeeBounds <&> (.defaultStepFee)) driverPickUpCharge driverParkingCharge quote.id.getId [] False quote.fareParams.congestionCharge searchTry.petCharges quote.fareParams.priorityCharges Nothing quote.fareParams.tollCharges quote.fareParams.govtCharges quote.fareParams.driverCancellationNotAllowed quote.fareParams.bufferedFare
+              mbQuoteFullFarePolicy <- SFP.getFarePolicyByEstOrQuoteIdWithoutFallback quote.id.getId
+              let quoteCommission = maybe legacyQuoteCommission (mfilter (> 0) . Just . FC.settlementCommissionTotal) quote.estimatedFareSettlement
+                  legacyQuoteCommission = (FC.calculateCommission quote.fareParams (mbQuoteFullFarePolicy >>= (.commissionChargeConfig)) (((.amount) <$> FC.carriedCancellationDuesCommission quote.currency quote.fareParams (FC.searchCancellationDuesCommission searchReq)))).totalCommission
+              SST.buildTripQuoteDetail searchReq quote.tripCategory quote.vehicleServiceTier quote.vehicleServiceTierName quote.estimatedFare Nothing searchTry.customerExtraFee Nothing 0 0 Nothing (mbDriverExtraFeeBounds <&> (.minFee)) (mbDriverExtraFeeBounds <&> (.maxFee)) (mbDriverExtraFeeBounds <&> (.stepFee)) (mbDriverExtraFeeBounds <&> (.defaultStepFee)) driverPickUpCharge driverParkingCharge quote.id.getId [] False quote.fareParams.congestionCharge searchTry.petCharges quote.fareParams.priorityCharges quoteCommission quote.fareParams.tollCharges quote.fareParams.govtCharges quote.fareParams.driverCancellationNotAllowed quote.fareParams.bufferedFare quote.farePolicy (Just quote.fareParams) searchTry.paymentChargeDetails searchTry.discountAmount
 
       tripQuoteDetails <-
         case tripQuoteDetailsWithoutUpgrades of
@@ -318,6 +324,8 @@ processSendSearchRequestJobWithMode dispatchMode jobId jobData = withLogTag ("Jo
                 tripQuoteDetails,
                 customerExtraFee = searchTry.customerExtraFee,
                 negativeFareAdjustment = searchTry.negativeFareAdjustment,
+                paymentChargeDetails = searchTry.paymentChargeDetails,
+                buyerOfferDiscount = searchTry.discountAmount,
                 messageId = searchTry.messageId,
                 isRepeatSearch = False,
                 isAllocatorBatch = True,
@@ -363,7 +371,7 @@ processSendSearchRequestJobWithMode dispatchMode jobId jobData = withLogTag ("Jo
           driverAdditionalCharges = filterChargesByApplicability (fromMaybe [] $ (.conditionalCharges) <$> estimate.farePolicy) searchReq
           businessDiscount = if searchTry.billingCategory == SLT.BUSINESS then fromMaybe 0.0 estimate.businessDiscount else 0.0
           personalDiscount = if searchTry.billingCategory == SLT.PERSONAL then fromMaybe 0.0 estimate.personalDiscount else 0.0
-      SST.buildTripQuoteDetail searchReq estimate.tripCategory estimate.vehicleServiceTier estimate.vehicleServiceTierName (estimate.minFare + fromMaybe 0 searchTry.customerExtraFee + fromMaybe 0 searchTry.petCharges - businessDiscount - personalDiscount) Nothing (mbDriverExtraFeeBounds <&> (.minFee)) (mbDriverExtraFeeBounds <&> (.maxFee)) (mbDriverExtraFeeBounds <&> (.stepFee)) (mbDriverExtraFeeBounds <&> (.defaultStepFee)) driverPickUpCharge driverParkingCharge estimate.id.getId driverAdditionalCharges estimate.eligibleForUpgrade ((.congestionCharge) =<< estimate.fareParams) searchTry.petCharges (estimate.fareParams >>= (.priorityCharges)) estimate.commissionCharges (estimate.fareParams >>= (.tollCharges)) (estimate.fareParams >>= (.govtCharges)) (estimate.fareParams >>= (.driverCancellationNotAllowed)) (estimate.fareParams >>= (.bufferedFare))
+      SST.buildTripQuoteDetail searchReq estimate.tripCategory estimate.vehicleServiceTier estimate.vehicleServiceTierName estimate.minFare (mbDriverExtraFeeBounds <&> (.minFee)) searchTry.customerExtraFee Nothing businessDiscount personalDiscount Nothing (mbDriverExtraFeeBounds <&> (.minFee)) (mbDriverExtraFeeBounds <&> (.maxFee)) (mbDriverExtraFeeBounds <&> (.stepFee)) (mbDriverExtraFeeBounds <&> (.defaultStepFee)) driverPickUpCharge driverParkingCharge estimate.id.getId driverAdditionalCharges estimate.eligibleForUpgrade ((.congestionCharge) =<< estimate.fareParams) searchTry.petCharges (estimate.fareParams >>= (.priorityCharges)) estimate.commissionCharges (estimate.fareParams >>= (.tollCharges)) (estimate.fareParams >>= (.govtCharges)) (estimate.fareParams >>= (.driverCancellationNotAllowed)) (estimate.fareParams >>= (.bufferedFare)) estimate.farePolicy estimate.fareParams searchTry.paymentChargeDetails searchTry.discountAmount
     filterChargesByApplicability conditionalCharges sReq = do
       let safetyCharges = if sReq.preferSafetyPlus then find (\ac -> (ac.chargeCategory) == DAC.SAFETY_PLUS_CHARGES) conditionalCharges else Nothing
           nyregularCharges = if fromMaybe False sReq.isReserveRide then find (\ac -> (ac.chargeCategory) == DAC.NYREGULAR_SUBSCRIPTION_CHARGE) conditionalCharges else Nothing

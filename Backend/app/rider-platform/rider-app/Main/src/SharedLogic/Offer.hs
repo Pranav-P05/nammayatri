@@ -10,7 +10,6 @@ import Control.Applicative ((<|>))
 import qualified Data.Aeson as A
 import qualified Data.Text as T
 import Data.Time (utctDay)
-import qualified Domain.SharedLogic.RideDiscount as RD
 import qualified Domain.Types.Booking as DRB
 import qualified Domain.Types.Estimate as DEstimate
 import qualified Domain.Types.Merchant as Merchant
@@ -52,8 +51,10 @@ import qualified Lib.Yudhishthira.Tools.DebugLog as LYDL
 import qualified Lib.Yudhishthira.Tools.Utils as LYTUtils
 import qualified Lib.Yudhishthira.Types as LYT
 import qualified Lib.Yudhishthira.TypesTH as YTH
+import qualified SharedLogic.FareBreakupLines as FBL
 import SharedLogic.JobScheduler (ExecuteCashRideCashbackPayoutJobData (..), RiderJobType (..))
 import SharedLogic.OfferTypes as Reexport
+import qualified SharedLogic.PaymentCharge as SPaymentCharge
 import qualified SharedLogic.Utils as SLUtils
 import Storage.Beam.Payment ()
 import qualified Storage.CachedQueries.Translations as CQTranslations
@@ -210,18 +211,18 @@ offerListCache merchantId personId merchantOperatingCityId paymentServiceType pr
   pure $ overrideOfferListRespAutoApply autoApplyOfferCodes offerListResp
 
 -- | Optional fare context — when provided, postOfferAmount is recomputed
---   via the shared 'Domain.SharedLogic.RideDiscount.applyRideDiscount'
---   algorithm so the VAT portion is scaled with the discount. When omitted,
---   offer.finalOrderAmount is used as-is (FRFS / pass flows etc.).
-type OfferFareCtx = Maybe RD.ProjectFareParamsBreakup
+--   via 'SharedLogic.FareBreakupLines.applyOffer' so the payment charge is
+--   re-priced on the discounted fare. When omitted, offer.finalOrderAmount is used as-is
+--   (FRFS / pass flows etc.).
+type OfferFareCtx = Maybe FBL.FareLines
 
--- | Recompute the post-offer amount: VAT-aware and payment-charge-aware when
+-- | Recompute the post-offer amount: payment-charge-aware when
 --   fare context + discount are both present, falls back to the payment
 --   library's finalOrderAmount otherwise.
 --
 --   When @offer.discountAmount > 0@ but no fare context was threaded
 --   through, we emit a warning — that path produces a stale figure that
---   doesn't reflect VAT redistribution, and should be fixed by threading
+--   doesn't reflect the re-priced payment charge, and should be fixed by threading
 --   the ctx from the caller.
 recomputePostOfferAmount ::
   (MonadFlow m) =>
@@ -235,8 +236,7 @@ recomputePostOfferAmount mbCtx offer = case mbCtx of
       -- re-priced on the post-discount fare rather than carried through or
       -- rescaled. This is why the saving exceeds the offer's face value, and it
       -- must match what the BPP captures.
-      let (updatedBreakup, _) = RD.applyDiscountAndRepriceCharge (RD.paymentChargeRateFromBreakup b) b offer.discountAmount
-       in pure $ RD.projectFareParamsBreakupTotal updatedBreakup
+      pure (FBL.applyOffer offer.discountAmount b).totalAfter
   Nothing | offer.discountAmount > 0 -> do
     logWarning $
       "recomputePostOfferAmount: offer " <> offer.offerId
@@ -263,14 +263,21 @@ getSelectedOfferDetailsWithBasket merchantId personId merchantOperatingCityId pa
   productOffers <- offerListWithBasket merchantId personId merchantOperatingCityId paymentServiceType [(productId, price)] [] [] mbRide mbBooking mbSearchReq
   case lookup productId productOffers of
     Nothing -> pure Nothing
-    Just resp -> do
-      let filteredOffers = filter (\o -> o.offerId == offerId) resp.offerResp
-      case listToMaybe filteredOffers of
+    Just resp ->
+      case listToMaybe (filter (\o -> o.offerId == offerId) resp.offerResp) of
         Nothing -> pure Nothing
         Just offer -> do
           entity <- mkOfferRespAPIEntity mbFareCtx offer
           computed <- deriveComputedOfferAmount mbFareCtx offer
           pure $ Just (entity, computed)
+
+recomputeOfferAmounts :: OfferFareCtx -> HighPrecMoney -> HighPrecMoney -> HighPrecMoney -> DPayment.ComputedOfferAmount
+recomputeOfferAmounts mbCtx discount cashback fallbackPostOfferAmount = case mbCtx of
+  Just b
+    | discount > 0 ->
+      let outcome = FBL.applyOffer discount b
+       in DPayment.ComputedOfferAmount {discountAmount = discount, payoutAmount = cashback, postOfferAmount = outcome.totalAfter, amountSaved = max 0 (outcome.totalBefore - outcome.totalAfter) + cashback}
+  _ -> DPayment.ComputedOfferAmount {discountAmount = discount, payoutAmount = cashback, postOfferAmount = fallbackPostOfferAmount, amountSaved = discount + cashback}
 
 deriveComputedOfferAmount ::
   (MonadFlow m) =>
@@ -296,8 +303,8 @@ offerAmountSaved mbCtx offer =
   case mbCtx of
     Just b
       | offer.discountAmount > 0 ->
-        let (updated, _) = RD.applyDiscountAndRepriceCharge (RD.paymentChargeRateFromBreakup b) b offer.discountAmount
-         in max 0 (RD.projectFareParamsBreakupTotal b - RD.projectFareParamsBreakupTotal updated) + offer.cashbackAmount
+        let outcome = FBL.applyOffer offer.discountAmount b
+         in max 0 (outcome.totalBefore - outcome.totalAfter) + offer.cashbackAmount
     _ -> offer.discountAmount + offer.cashbackAmount
 
 -------------------------------------------------------------------------------------------------------
@@ -643,6 +650,14 @@ mkOfferRespAPIEntity mbFareCtx offer@Payment.OfferResp {..} = do
         maxApplyCount = counters >>= (.maxApplyCount),
         showMilestoneCard = uiConfigs >>= (.showMilestoneCard)
       }
+
+withPostOfferGross :: Currency -> Maybe SPaymentCharge.PaymentChargeDetails -> CumulativeOfferResp -> CumulativeOfferResp
+withPostOfferGross currency mbPaymentCharge CumulativeOfferResp {..} =
+  CumulativeOfferResp {offerListResp = map withGross offerListResp, ..}
+  where
+    withGross offer =
+      let grossAmount = SPaymentCharge.mkGrossAmount currency mbPaymentCharge offer.postOfferAmount
+       in offer {postOfferAmount = grossAmount, estimatedPostOfferAmount = grossAmount}
 
 -- | Replace each offer's display text (title/description/tnc) with the rider's
 -- language translation from the shared `translations` table, keyed by OFFER_*.

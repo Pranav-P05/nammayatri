@@ -25,6 +25,7 @@ import qualified Domain.Types.DriverInformation as DDI
 import qualified Domain.Types.DriverRidePayoutBankAccount as DDPBA
 import Domain.Types.Merchant
 import qualified Domain.Types.MerchantOperatingCity as DTMM
+import Domain.Types.PaymentChargeBearer (PaymentChargeBearer)
 import Domain.Types.Person
 import qualified Domain.Types.Person as DPerson
 import qualified Domain.Types.Ride as DRide
@@ -61,7 +62,7 @@ import Lib.Scheduler.JobStorageType.SchedulerType (createJobIn)
 import qualified Lib.Types.SpecialLocation as SL
 import SharedLogic.Allocator (AllocatorJobType (..), CheckDriverPickupProgressJobData (..))
 import qualified SharedLogic.Analytics as Analytics
-import qualified SharedLogic.CallBAPInternal as CallBAPInternal
+import qualified SharedLogic.BookingFare as SBF
 import qualified SharedLogic.DriverPool as DP
 import qualified SharedLogic.External.LocationTrackingService.Flow as LF
 import qualified SharedLogic.External.LocationTrackingService.Types as LT
@@ -163,7 +164,7 @@ initializeRide merchant driver booking mbOtpCode enableFrequentLocationUpdates m
               Just _ -> transporterConfig.subscriptionConfig.fleetPrepaidSubscriptionThreshold
               Nothing -> transporterConfig.subscriptionConfig.prepaidSubscriptionThreshold
             balance = fromMaybe 0 mbAvailableBalance
-            fareSumTotal = FC.fareSum booking.fareParams Nothing
+            fareSumTotal = fst (FC.fareSum (FC.bookingFareChargeRates Nothing Nothing booking) booking.fareParams Nothing)
             fareScale = case booking.fareParams.bufferedFare of
               Just bf | fareSumTotal > 0 -> bf.getHighPrecMoney / fareSumTotal.getHighPrecMoney
               _ -> 1
@@ -200,9 +201,8 @@ initializeRide merchant driver booking mbOtpCode enableFrequentLocationUpdates m
   let isDriverOnRide = bool (Just False) (previousRideInprogress >>= Just . isJust <$> (.driverTripEndLocation)) (isJust previousRideInprogress)
   now <- getCurrentTime
   vehicle <- QVeh.findById driver.id >>= fromMaybeM (VehicleNotFound driver.id.getId)
-  mbFarePolicy <- SFP.getFarePolicyByEstOrQuoteIdWithoutFallback booking.quoteId
-  commission <- FC.calculateCommission booking.fareParams mbFarePolicy
-  cancellationCommission <- FC.calculateCancellationCommission booking.fareParams mbFarePolicy
+  let commission = booking.commission
+      cancellationCommission = booking.cancellationCommission
   let (mbPaymentCharge, mbPaymentChargeBearer) = (booking.paymentCharge, booking.paymentChargeBearer)
       -- A dashboard/fleet assignment always wins regardless of timing; only a genuine
       -- driver self-accept falls back to the broadcast-window timing check. A driver
@@ -296,6 +296,17 @@ initializeRide merchant driver booking mbOtpCode enableFrequentLocationUpdates m
       rideRelatedNotificationConfigList <- getConfig (RideRelatedNotificationConfigDimensions {merchantOperatingCityId = booking.merchantOperatingCityId.getId, timeDiffEvent = Just timeDiffEvent}) Nothing
       forM_ rideRelatedNotificationConfigList (SN.pushReminderUpdatesInScheduler booking ride now driver.id)
 
+applyUpdateRequestBookingFare ::
+  DBooking.Booking ->
+  DBUR.BookingUpdateRequest ->
+  Flow ()
+applyUpdateRequestBookingFare booking bookingUpdateReq = do
+  fareParams <- QFP.findById bookingUpdateReq.fareParamsId >>= fromMaybeM (FareParametersNotFound bookingUpdateReq.fareParamsId.getId)
+  mbFarePolicy <- SFP.getFarePolicyByBookingUpdateRequestId bookingUpdateReq.id.getId
+  transporterConfig <- getOneConfig (TransporterConfigDimensions {merchantOperatingCityId = booking.merchantOperatingCityId.getId}) Nothing >>= fromMaybeM (TransporterConfigNotFound booking.merchantOperatingCityId.getId)
+  let bookingFare = SBF.rebuildBookingFare transporterConfig mbFarePolicy booking bookingUpdateReq.discountAmount bookingUpdateReq.estimatedFare fareParams
+  QRB.updateBookingFare (SBF.applyBookingFare bookingFare booking)
+
 recomputeRideFinancialsForFareUpdate ::
   DBooking.Booking ->
   DRide.Ride ->
@@ -304,30 +315,15 @@ recomputeRideFinancialsForFareUpdate ::
 recomputeRideFinancialsForFareUpdate booking ride bookingUpdateReq = do
   newFareParams <- QFP.findById bookingUpdateReq.fareParamsId >>= fromMaybeM (FareParametersNotFound bookingUpdateReq.fareParamsId.getId)
   mbFarePolicy <- SFP.getFarePolicyByEstOrQuoteIdWithoutFallback booking.quoteId
-  newCommission <- FC.calculateCommission newFareParams mbFarePolicy
-  newCancellationCommission <- FC.calculateCancellationCommission newFareParams mbFarePolicy
   let softStaleAgainstBooking = booking.estimatedFare /= bookingUpdateReq.oldEstimatedFare
       currentDiscount = if softStaleAgainstBooking then ride.discountAmount else bookingUpdateReq.discountAmount <|> ride.discountAmount
   rawDiscountAmount <-
-    if softStaleAgainstBooking && isJust currentDiscount && bookingUpdateReq.estimatedFare /= booking.estimatedFare
-      then do
-        appBackendBapInternal <- asks (.appBackendBapInternal)
-        let reqBody =
-              CallBAPInternal.OfferDiscountReq
-                { fareAmount = Just bookingUpdateReq.estimatedFare,
-                  projectFareParamsBreakup = FC.projectFareParamsBreakup newFareParams
-                }
-        result <-
-          withTryCatch "getOfferDiscount:recomputeRideFinancialsForFareUpdate" $
-            CallBAPInternal.getOfferDiscount appBackendBapInternal.apiKey appBackendBapInternal.url booking.id.getId reqBody
-        case result of
-          Right resp -> pure resp.discountAmount
-          Left err -> do
-            logError $ "Error getting offer discount on fare update, falling back to current discount: " <> show err
-            pure currentDiscount
+    if softStaleAgainstBooking
+      then SBF.refreshOfferDiscount booking currentDiscount Nothing booking.fareParams newFareParams
       else pure currentDiscount
   let finalDiscount = FC.clampDiscountToDiscountable newFareParams rawDiscountAmount
-  QRide.updateCommissionAndDiscount newCommission newCancellationCommission finalDiscount ride.id
+      newSettlement = snd (FC.fareSum (FC.bookingFareChargeRates (mbFarePolicy >>= (.commissionChargeConfig)) finalDiscount booking) newFareParams Nothing)
+  QRide.updateCommissionAndDiscount ((.amount) <$> newSettlement.commission) ((.amount) <$> newSettlement.cancellationDuesCommission) finalDiscount ride.id
 
 releaseLien ::
   ( Finance.HasActorInfo m r,
@@ -574,7 +570,7 @@ buildRide ::
   Maybe HighPrecMoney ->
   Maybe HighPrecMoney ->
   Maybe HighPrecMoney ->
-  Maybe Text ->
+  Maybe PaymentChargeBearer ->
   Maybe DRide.ScheduledAcceptanceMode ->
   Flow DRide.Ride
 buildRide driver booking ghrId otp enableFrequentLocationUpdates clientId dinfo now vehicle onlinePayment enableOtpLessRide mFleetOwnerId commission cancellationCommission mbPaymentCharge mbPaymentChargeBearer mbScheduledAcceptanceMode = do
@@ -706,6 +702,8 @@ buildRide driver booking ghrId otp enableFrequentLocationUpdates clientId dinfo 
         cancellationFaultRule = Nothing,
         cancellationFeeTaxIfCancelled = Nothing,
         cancellationConsequenceRowIdIfCancelled = Nothing,
+        fareSettlement = Nothing,
+        cancellationSettlement = Nothing,
         cancellationFaultVerdict = Nothing,
         pickupBehaviour = Nothing,
         pickupDarkSeconds = Nothing,

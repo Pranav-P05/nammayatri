@@ -44,6 +44,7 @@ import qualified Domain.Types.DriverOffer as DDO
 import qualified Domain.Types.Estimate as DEstimate
 import qualified Domain.Types.EstimateStatus as DEstimate
 import qualified Domain.Types.Extra.MerchantPaymentMethod as DMPM
+import qualified Domain.Types.FareBreakup as DFareBreakup
 import qualified Domain.Types.Journey as DJ
 import qualified Domain.Types.JourneyLeg as DJL
 import Domain.Types.LocationAddress (LocationAddress)
@@ -81,10 +82,15 @@ import qualified Kernel.Utils.Predicates as P
 import Kernel.Utils.Validation
 import Lib.ConfigPilot.Interface.Types (getConfig, getOneConfig)
 import qualified Lib.Finance.Core.Types as Finance
+import qualified Lib.Payment.Domain.Types.PaymentOrder as DOrder
 import Lib.SessionizerMetrics.Types.Event
+import qualified SharedLogic.FareBreakupInfo as SFareBreakupInfo
+import qualified SharedLogic.FareBreakupLines as FBL
 import qualified SharedLogic.LocationAddressEnrichment as LAE
 import SharedLogic.MerchantPaymentMethod
+import qualified SharedLogic.Offer as SOffer
 import qualified SharedLogic.Payment as SPayment
+import qualified SharedLogic.PaymentCharge as SPaymentCharge
 import SharedLogic.Quote
 import SharedLogic.Type
 import qualified Storage.CachedQueries.BppDetails as CQBPP
@@ -224,6 +230,9 @@ data DSelectRes = DSelectRes
     mbJourneyId :: Maybe (Id DJ.Journey),
     paymentMethodInfo :: Maybe DMPM.PaymentMethodInfo,
     paymentInstrument :: Maybe DMPM.PaymentInstrument,
+    paymentChargeDetails :: Maybe SPaymentCharge.PaymentChargeDetails,
+    platformDeductions :: SPaymentCharge.PlatformDeductions,
+    offerDiscountAmount :: Maybe HighPrecMoney,
     paymentMode :: Maybe DMPM.PaymentMode,
     emailDomain :: Maybe Text,
     customerRating :: Maybe Centesimal,
@@ -286,7 +295,8 @@ select2 personId estimateId req@DSelectReq {..} mbJourneyLegData = do
   let merchantOperatingCityId = searchRequest.merchantOperatingCityId
 
   city <- CQMOC.findById merchantOperatingCityId >>= fmap (.city) . fromMaybeM (MerchantOperatingCityNotFound merchantOperatingCityId.getId)
-  let mbCustomerExtraFee = (mkPriceFromAPIEntity <$> req.customerExtraFeeWithCurrency) <|> (mkPriceFromMoney Nothing <$> req.customerExtraFee)
+  selectedPaymentCharge <- SPaymentCharge.resolvePaymentChargeDetails merchantOperatingCityId req.paymentInstrument
+  let mbCustomerExtraFee = (\fee -> mkPrice (Just fee.currency) (SPaymentCharge.chargeAmountFromPayable fee.currency estimate.riderTaxRates selectedPaymentCharge fee.amount)) <$> ((mkPriceFromAPIEntity <$> req.customerExtraFeeWithCurrency) <|> (mkPriceFromMoney Nothing <$> req.customerExtraFee))
   let mbNegativeFareAdjustment = (mkPriceFromAPIEntity <$> req.negativeFareAdjustmentWithCurrency) <|> (mkPriceFromMoney Nothing <$> req.negativeFareAdjustment)
   Kernel.Prelude.whenJust req.customerExtraFeeWithCurrency $ \reqWithCurrency -> do
     unless (estimate.estimatedFare.currency == reqWithCurrency.currency) $
@@ -330,6 +340,7 @@ select2 personId estimateId req@DSelectReq {..} mbJourneyLegData = do
 
   merchantPaymentMethod <- maybe (return Nothing) (\pmId -> getOneConfig (MerchantPaymentMethodDimensions {merchantOperatingCityId = merchantOperatingCityId.getId, configId = Just pmId}) (Just (maybeToList <$> QMPM.findById (Id pmId)))) req.paymentMethodId
   let paymentMethodInfo = mkPaymentMethodInfo <$> merchantPaymentMethod
+  paymentChargeDetails <- SPaymentCharge.resolvePaymentChargeDetails merchantOperatingCityId paymentInstrument
   when (maybe False Trip.isDeliveryTrip (DEstimate.tripCategory estimate)) $ do
     validDeliveryDetails <- deliveryDetails & fromMaybeM (InvalidRequest "Delivery details not found for trip category Delivery")
     updateRequiredDeliveryDetails searchRequestId searchRequest.merchantId searchRequest.merchantOperatingCityId validDeliveryDetails
@@ -344,7 +355,20 @@ select2 personId estimateId req@DSelectReq {..} mbJourneyLegData = do
   QSearchRequest.updateMultipleByRequestId searchRequestId autoAssignEnabled (fromMaybe False autoAssignEnabledV2) isAdvancedBookingEnabled
   QPFS.updateStatus searchRequest.riderId DPFS.WAITING_FOR_DRIVER_OFFERS {estimateId = estimateId, otherSelectedEstimates, validTill = searchRequest.validTill, providerId = Just estimate.providerId, tripCategory = estimate.tripCategory, searchRequestId = Just searchRequest.id}
   QEstimate.updateStatus DEstimate.DRIVER_QUOTE_REQUESTED estimateId
-  QEstimate.updateSelectedOfferId selectedOfferId estimateId
+  offerDiscountAmount <- case selectedOfferId of
+    Nothing -> pure Nothing
+    Just offerId -> do
+      mbFareBreakups <- SFareBreakupInfo.findFareBreakupItems estimate.id.getId DFareBreakup.ESTIMATE
+      let fareCtx = FBL.fareLinesFromRateCard estimate.estimatedTotalFare.amount mbFareBreakups $ (\eb -> (eb.title, eb.price.value.amount)) <$> estimate.estimateBreakupList
+          offerBaseAmount = maybe estimate.estimatedTotalFare.amount FBL.offerBasePrice fareCtx
+          offerBasePrice = mkPrice (Just estimate.estimatedTotalFare.currency) offerBaseAmount
+      offerResult <- withTryCatch "selectOfferDiscount" $ SOffer.getSelectedOfferDetailsWithBasket searchRequest.merchantId personId merchantOperatingCityId DOrder.RideHailing (show estimate.vehicleServiceTierType) offerBasePrice offerId fareCtx Nothing Nothing (Just searchRequest)
+      case offerResult of
+        Left err -> do
+          logError $ "Failed to compute selected offer discount for estimateId " <> estimateId.getId <> ": " <> show err
+          pure Nothing
+        Right mbOffer -> pure $ mfilter (> 0) ((.discountAmount) . snd <$> mbOffer)
+  QEstimate.updateSelectedOfferId selectedOfferId offerDiscountAmount estimateId
   QDOffer.updateStatus DDO.INACTIVE estimateId
   when (isJust mbCustomerExtraFee || isJust mbNegativeFareAdjustment || isJust req.paymentMethodId || isJust req.paymentInstrument) $ do
     void $ QSearchRequest.updateCustomerExtraFeeAndPaymentMethod searchRequest.id mbCustomerExtraFee mbNegativeFareAdjustment req.paymentMethodId req.paymentInstrument
@@ -376,6 +400,9 @@ select2 personId estimateId req@DSelectReq {..} mbJourneyLegData = do
         customerRating = person.rating,
         customerTotalRatings = person.totalRatings,
         customerGender = person.gender,
+        platformDeductions = SPaymentCharge.platformDeductionsAtPayment (merchant.onlinePayment && paymentInstrument /= Just DMPM.Cash) paymentChargeDetails,
+        customerExtraFee = (.amountInt) <$> mbCustomerExtraFee,
+        customerExtraFeeWithCurrency = mkRoundedPriceAPIEntity <$> mbCustomerExtraFee,
         ..
       }
   where
@@ -436,7 +463,7 @@ selectList estimateId = do
   selectedQuotes <- runInReplica $ QQuote.findAllByEstimateId estimateId DDO.ACTIVE
   bppDetailList <- forM ((.providerId) <$> selectedQuotes) (\bppId -> CQBPP.findBySubscriberIdAndDomain bppId Context.MOBILITY >>= fromMaybeM (InternalError $ "BPP details not found for providerId:-" <> bppId <> "and domain:-" <> show Context.MOBILITY))
   isValueAddNPList <- forM bppDetailList $ \bpp -> CQVAN.isValueAddNP bpp.subscriberId
-  pure $ SelectListRes $ mkQAPIEntityList selectedQuotes bppDetailList isValueAddNPList
+  pure $ SelectListRes $ mkQAPIEntityList Nothing mempty selectedQuotes bppDetailList isValueAddNPList
 
 selectResult :: (CacheFlow m r, EsqDBFlow m r, EsqDBReplicaFlow m r) => Id DEstimate.Estimate -> m QuotesResultResponse
 selectResult estimateId = do
@@ -454,7 +481,7 @@ selectResult estimateId = do
       selectedQuotes <- runInReplica $ QQuote.findAllQuotesBySRId estimate.requestId DDO.ACTIVE
       bppDetailList <- forM ((.providerId) <$> selectedQuotes) (\bppId -> CQBPP.findBySubscriberIdAndDomain bppId Context.MOBILITY >>= fromMaybeM (InternalError $ "BPP details not found for providerId:-" <> bppId <> "and domain:-" <> show Context.MOBILITY))
       isValueAddNPList <- forM bppDetailList $ \bpp -> CQVAN.isValueAddNP bpp.subscriberId
-      return $ QuotesResultResponse {bookingId = Nothing, bookingIdV2 = Nothing, selectedQuotes = Just $ SelectListRes $ mkQAPIEntityList selectedQuotes bppDetailList isValueAddNPList, ..}
+      return $ QuotesResultResponse {bookingId = Nothing, bookingIdV2 = Nothing, selectedQuotes = Just $ SelectListRes $ mkQAPIEntityList Nothing mempty selectedQuotes bppDetailList isValueAddNPList, ..}
 
 updateRequiredDeliveryDetails :: SelectFlow m r c => Id DSearchReq.SearchRequest -> Id DM.Merchant -> Id DMOC.MerchantOperatingCity -> DTDD.DeliveryDetails -> m ()
 updateRequiredDeliveryDetails searchRequestId merchantId merchantOperatingCityId deliveryDetails = do

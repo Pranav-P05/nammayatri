@@ -16,6 +16,7 @@ import qualified Kernel.Types.Common
 import Kernel.Types.Error
 import qualified Kernel.Types.Id
 import Kernel.Utils.Common (CacheFlow, EsqDBFlow, MonadFlow, fromMaybeM, getCurrentTime)
+import qualified Kernel.Utils.JSON
 import qualified Kernel.Utils.Version
 import qualified Storage.Beam.DriverQuote as Beam
 import Storage.Queries.Transformers.DriverQuote
@@ -50,6 +51,7 @@ instance FromTType' Beam.DriverQuote Domain.Types.DriverQuote.DriverQuote where
             durationToPickup = durationToPickup,
             estimateId = Kernel.Types.Id.Id estimateId,
             estimatedFare = Kernel.Types.Common.mkAmountWithDefault estimatedFareAmount estimatedFare,
+            estimatedFareSettlement = Kernel.Utils.JSON.valueToMaybe =<< estimatedFareSettlement,
             fareParams = fareParams',
             goHomeRequestId = Kernel.Types.Id.Id <$> goHomeRequestId,
             id = Kernel.Types.Id.Id id,
@@ -99,6 +101,7 @@ instance ToTType' Beam.DriverQuote Domain.Types.DriverQuote.DriverQuote where
         Beam.estimateId = Kernel.Types.Id.getId estimateId,
         Beam.estimatedFare = Kernel.Prelude.roundToIntegral estimatedFare,
         Beam.estimatedFareAmount = Kernel.Prelude.Just estimatedFare,
+        Beam.estimatedFareSettlement = toJSON <$> estimatedFareSettlement,
         Beam.fareParametersId = Kernel.Types.Id.getId ((.id) fareParams),
         Beam.goHomeRequestId = Kernel.Types.Id.getId <$> goHomeRequestId,
         Beam.id = Kernel.Types.Id.getId id,

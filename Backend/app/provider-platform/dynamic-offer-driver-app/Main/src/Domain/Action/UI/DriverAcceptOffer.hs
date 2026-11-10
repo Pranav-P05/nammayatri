@@ -92,6 +92,9 @@ import Utils.Common.Cac.KeyNameConstants
 isAllowedExtraFee :: DriverExtraFeeBounds -> HighPrecMoney -> Bool
 isAllowedExtraFee extraFee val = extraFee.minFee <= val && val <= extraFee.maxFee
 
+driverOfferedGross :: FC.FareChargeRates -> Maybe DriverExtraFeeBounds -> HighPrecMoney -> HighPrecMoney
+driverOfferedGross rates mbBounds = FC.mkGrossAmount rates (Just DFarePolicy.DriverSelectedFareComponent) (maybe [] (\bounds -> [bounds.minFee, bounds.maxFee]) mbBounds)
+
 -- | Everything needed to build a driver quote, cache its fare policy, event-stream it, and offer it to the BAP.
 -- Shared by acceptDynamicOfferDriverRequest and every path that replays it server-side (silent-assign, reassignment on cancel/pickup-stall/schedule-update).
 type AcceptDynamicOfferFlow m r c =
@@ -154,14 +157,17 @@ acceptDynamicOfferDriverRequest ::
   -- | "Find a better driver" swap action; used only when this try is a BETTER_DRIVER_SEARCH.
   Maybe (DDrQuote.DriverQuote -> m (Maybe RideCommon.DriverRideRes)) ->
   m ([SearchRequestForDriver], Maybe RideCommon.DriverRideRes)
-acceptDynamicOfferDriverRequest mbReusedAssign clientId merchantId merchantOpCityId merchant searchTry searchReq driver sReqFD mbBundleVersion' mbClientVersion' mbConfigVersion' mbReactBundleVersion' mbDevice' reqOfferedValue driverStats transporterConfig mbOneShotAssign mbBetterDriverSwapAssign = do
+acceptDynamicOfferDriverRequest mbReusedAssign clientId merchantId merchantOpCityId merchant searchTry searchReq driver sReqFD mbBundleVersion' mbClientVersion' mbConfigVersion' mbReactBundleVersion' mbDevice' reqOfferedNetValue driverStats transporterConfig mbOneShotAssign mbBetterDriverSwapAssign = do
   let estimateId = fromMaybe searchTry.estimateId sReqFD.estimateId -- backward compatibility
-  logDebug $ "offered fare: " <> show reqOfferedValue
+  logDebug $ "offered fare net: " <> show reqOfferedNetValue
   quoteLimit <- getQuoteLimit searchReq.estimatedDistance sReqFD.vehicleServiceTier searchTry.tripCategory searchReq (fromMaybe SL.Default searchReq.area) searchTry.searchRepeatType searchTry.searchRepeatCounter
   quoteCount <- runInReplica $ QDrQt.countAllBySTId searchTry.id
   when (quoteCount >= quoteLimit) (throwError QuoteAlreadyRejected)
   farePolicy <- getFarePolicyByEstOrQuoteId Nothing (Just $ Maps.getCoordinates searchReq.fromLocation) (Just . Maps.getCoordinates =<< searchReq.toLocation) searchReq.fromLocGeohash searchReq.toLocGeohash searchReq.estimatedDistance searchReq.estimatedDuration merchantOpCityId searchTry.tripCategory sReqFD.vehicleServiceTier searchReq.area estimateId Nothing Nothing searchReq.dynamicPricingLogicVersion (Just (TransactionId (Id searchReq.transactionId))) searchReq.configInExperimentVersions searchReq.specialLocationName
   let driverExtraFeeBounds = DFarePolicy.findDriverExtraFeeBoundsByDistance (fromMaybe 0 searchReq.estimatedDistance) <$> farePolicy.driverExtraFeeBounds
+      rates = (FC.fareChargeRates transporterConfig (Just farePolicy) searchTry.paymentChargeDetails searchTry.discountAmount searchTry.currency) {FC.cancellationDuesCommission = FC.searchCancellationDuesCommission searchReq}
+      reqOfferedValue = driverOfferedGross rates driverExtraFeeBounds <$> reqOfferedNetValue
+  logDebug $ "offered fare gross: " <> show reqOfferedValue
   whenJust reqOfferedValue $ \off ->
     whenJust driverExtraFeeBounds $ \driverExtraFeeBounds' ->
       unless (isAllowedExtraFee driverExtraFeeBounds' off) $
@@ -193,6 +199,8 @@ acceptDynamicOfferDriverRequest mbReusedAssign clientId merchantId merchantOpCit
           computationPhase = FCEstimate,
           mbCapConfig = Nothing,
           mbEstimateFareParams = Nothing,
+          paymentChargeDetails = searchTry.paymentChargeDetails,
+          buyerOfferDiscount = searchTry.discountAmount,
           actualDistance = searchReq.estimatedDistance,
           rideTime = sReqFD.startTime,
           returnTime = searchReq.returnTime,
@@ -210,6 +218,7 @@ acceptDynamicOfferDriverRequest mbReusedAssign clientId merchantId merchantOpCit
           negotiatedFareDelta = Nothing,
           nightShiftCharge = Nothing,
           customerCancellationDues = searchReq.customerCancellationDues,
+          customerCancellationDuesTaxBreakup = searchReq.customerCancellationDuesTaxBreakup,
           tollCharges = searchReq.tollCharges,
           isManualTollCharge = False,
           estimatedRideDuration = searchReq.estimatedDuration,
@@ -222,10 +231,9 @@ acceptDynamicOfferDriverRequest mbReusedAssign clientId merchantId merchantOpCit
           shouldApplyBusinessDiscount = searchTry.billingCategory == SLT.BUSINESS,
           shouldApplyPersonalDiscount = searchTry.billingCategory == SLT.PERSONAL,
           distanceUnit = searchReq.distanceUnit,
-          merchantOperatingCityId = Just merchantOpCityId,
+          merchantOperatingCityId = merchantOpCityId,
           mbAdditonalChargeCategories = Just sReqFD.conditionalCharges,
           numberOfLuggages = searchReq.numberOfLuggages,
-          govtChargesRate = Just transporterConfig.taxConfig.rideGst,
           pickupGateId = searchReq.pickupGateId,
           fareSettlementType = farePolicy'.fareSettlementType,
           isParkingFeeExempt = rcParkingFeeExempt,
@@ -266,7 +274,7 @@ acceptDynamicOfferDriverRequest mbReusedAssign clientId merchantId merchantOpCit
         if searchTry.searchRepeatType == DST.BETTER_DRIVER_SEARCH then mbBetterDriverSwapAssign else Nothing
       mbLocalAssignAction = mbBetterDriverSwapAction <|> mbOneShotAction
   -- One-shot builds the winning quote directly in its terminal state: no Active -> Inactive flip
-  driverQuote <- buildDriverQuote (if isJust mbLocalAssignAction then DDrQuote.Inactive else DDrQuote.Active) clientId driver driverStats searchReq sReqFD estimateId searchTry.tripCategory fareParams mbBundleVersion' mbClientVersion' mbConfigVersion' mbReactBundleVersion' mbDevice'
+  driverQuote <- buildDriverQuote (if isJust mbLocalAssignAction then DDrQuote.Inactive else DDrQuote.Active) clientId driver driverStats searchReq sReqFD estimateId searchTry.tripCategory rates fareParams mbBundleVersion' mbClientVersion' mbConfigVersion' mbReactBundleVersion' mbDevice'
   void $
     if keepFarePolicyForWholeTrip searchTry.isScheduled searchTry.tripCategory
       then cacheFarePolicyByScheduledEstOrQuoteId driverQuote.id.getId searchReq.startTime searchReq.returnTime farePolicy
@@ -321,6 +329,7 @@ buildDriverQuote ::
   SearchRequestForDriver ->
   Text ->
   DTC.TripCategory ->
+  FC.FareChargeRates ->
   Fare.FareParameters ->
   Maybe Version ->
   Maybe Version ->
@@ -328,7 +337,7 @@ buildDriverQuote ::
   Maybe Text ->
   Maybe Text ->
   m DDrQuote.DriverQuote
-buildDriverQuote initialStatus clientId driver driverStats searchReq sd estimateId tripCategory fareParams mbBundleVersion' mbClientVersion' mbConfigVersion' mbReactBundleVersion' mbDevice' = do
+buildDriverQuote initialStatus clientId driver driverStats searchReq sd estimateId tripCategory rates fareParams mbBundleVersion' mbClientVersion' mbConfigVersion' mbReactBundleVersion' mbDevice' = do
   guid <- generateGUID
   now <- getCurrentTime
   deploymentVersion <- asks (.version)
@@ -340,7 +349,7 @@ buildDriverQuote initialStatus clientId driver driverStats searchReq sd estimate
         geoAddDynamicPricingCounter mkAcceptanceVehicleCategoryWithDistanceBin mkAcceptanceVehicleCategory mkAcceptanceVehicleCategoryCity now sd.vehicleCategory searchReq.fromLocation.lat searchReq.fromLocation.lon sd.searchTryId.getId ((.getMeters) <$> searchReq.estimatedDistance) searchReq.merchantOperatingCityId.getId
     else pure ()
   driverQuoteExpirationSeconds <- asks (.driverQuoteExpirationSeconds)
-  let estimatedFare = fareSum fareParams $ Just sd.conditionalCharges
+  let (estimatedFare, fareSettlement) = fareSum rates fareParams $ Just sd.conditionalCharges
   pure
     DDrQuote.DriverQuote
       { id = guid,
@@ -364,6 +373,7 @@ buildDriverQuote initialStatus clientId driver driverStats searchReq sd estimate
         validTill = addUTCTime driverQuoteExpirationSeconds now,
         providerId = searchReq.providerId,
         estimatedFare,
+        estimatedFareSettlement = Just fareSettlement,
         fareParams,
         specialLocationTag = searchReq.specialLocationTag,
         specialLocationName = searchReq.specialLocationName,

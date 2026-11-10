@@ -1,0 +1,1 @@
+ALTER TABLE atlas_driver_offer_bpp.quote_special_zone ADD COLUMN estimated_fare_settlement json;

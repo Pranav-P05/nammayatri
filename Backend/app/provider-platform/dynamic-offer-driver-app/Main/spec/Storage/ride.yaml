@@ -1,4 +1,7 @@
 imports:
+  PaymentChargeBearer: Domain.Types.PaymentChargeBearer
+  CancellationSettlement: Domain.Types.FareSettlement
+  FareSettlement: Domain.Types.FareSettlement
   SubscriptionPurchase: Domain.Types.SubscriptionPurchase
   Merchant: Domain.Types.Merchant
   MerchantOperatingCity: Domain.Types.MerchantOperatingCity
@@ -30,6 +33,8 @@ imports:
   Sos: Safety.Domain.Types.Sos
   PayoutFlagReason: Domain.Types.RiderDetails
   CancellationReasonCode: Domain.Types.CancellationReason
+  TaxBreakup: BecknV2.OnDemand.FareBreakup.Tax
+  Value: Data.Aeson
 
 Ride:
   tableName: ride
@@ -155,7 +160,7 @@ Ride:
     commission: Maybe HighPrecMoney
     cancellationCommission: Maybe HighPrecMoney
     paymentCharge: Maybe HighPrecMoney
-    paymentChargeBearer: Maybe Text
+    paymentChargeBearer: Maybe PaymentChargeBearer
     discountAmount: Maybe HighPrecMoney
     driverGpsTurnedOff: Maybe Bool
     finalFarePolicyId: Maybe (Id FarePolicy)
@@ -169,6 +174,8 @@ Ride:
     cancellationReasonCode: Maybe CancellationReasonCode
     cancellationAdditionalInfo: Maybe Text
     bapSettled: Maybe Bool # online ride: False at creation, True once RSF settles its order (on_receiver_recon ACKed with 01 Paid); cash ride: always Nothing
+    fareSettlement: Maybe FareSettlement
+    cancellationSettlement: Maybe CancellationSettlement
 
   sqlType:
     id: character(36)
@@ -190,6 +197,8 @@ Ride:
     rideTags: "text[]"
     finalFarePolicyId: character(36)
     subscriptionPurchaseIds: "text[]"
+    fareSettlement: "json"
+    cancellationSettlement: "json"
 
   default:
     traveledDistance: '0'
@@ -234,6 +243,7 @@ Ride:
       estimatedEndTimeRangeEnd: Maybe UTCTime
 
   fromTType:
+    paymentChargeBearer: (paymentChargeBearer >>= (readMaybe . Data.Text.unpack))|E
     toLocation: Storage.Queries.Transformers.Ride.getToLocation id bookingId merchantId merchantOperatingCityId|IM
     fromLocation: Storage.Queries.Transformers.Ride.getFromLocation id bookingId merchantId merchantOperatingCityId|IM
     stops: Storage.Queries.Transformers.Ride.getStops id hasStops|EM
@@ -264,8 +274,11 @@ Ride:
     isInsured: Kernel.Prelude.fromMaybe False isInsured|E
     billingCategory: Kernel.Prelude.fromMaybe SharedLogic.Type.PERSONAL billingCategory|E
     cancellationReasonCode: Domain.Types.CancellationReason.CancellationReasonCode <$> cancellationReasonCode|E
+    fareSettlement: Kernel.Utils.JSON.valueToMaybe =<< fareSettlement|E
+    cancellationSettlement: Kernel.Utils.JSON.valueToMaybe =<< cancellationSettlement|E
 
   toTType:
+    paymentChargeBearer: ((Data.Text.pack . show) <$> paymentChargeBearer)|E
     trackingUrl: Kernel.Prelude.showBaseUrl|I
     tripStartLat: Kernel.Prelude.fmap (.lat)|I
     tripStartLon: Kernel.Prelude.fmap (.lon)|I
@@ -302,8 +315,11 @@ Ride:
     isInsured: Kernel.Prelude.Just|I
     billingCategory: Kernel.Prelude.Just billingCategory|E
     cancellationReasonCode: (\(Domain.Types.CancellationReason.CancellationReasonCode x) -> x) <$> cancellationReasonCode|E
+    fareSettlement: toJSON <$> fareSettlement|E
+    cancellationSettlement: toJSON <$> cancellationSettlement|E
 
   beamType:
+    paymentChargeBearer: Maybe Text
     trackingUrl: Text
     merchantOperatingCityId: Maybe Text
     clientBundleVersion: Maybe Text
@@ -324,6 +340,8 @@ Ride:
     isInsured: Maybe Bool
     billingCategory: Maybe BillingCategory
     cancellationReasonCode: Maybe Text
+    fareSettlement: Maybe Value
+    cancellationSettlement: Maybe Value
 
   constraints:
     id: PrimaryKey
@@ -348,7 +366,7 @@ Ride:
       where: id
     updateCancellationQuoteIfCancelled:
       kvFunction: updateOneWithKV
-      params: [cancellationFeeIfCancelled, cancellationFeeTaxIfCancelled, cancellationConsequenceRowIdIfCancelled]
+      params: [cancellationFeeIfCancelled, cancellationFeeTaxIfCancelled, cancellationSettlement, cancellationConsequenceRowIdIfCancelled]
       where: id
     updateCancellationFaultVerdict:
       kvFunction: updateOneWithKV
@@ -358,13 +376,10 @@ Ride:
       kvFunction: updateOneWithKV
       params: [tipAmount]
       where: id
+
     updateDiscountAmount:
       kvFunction: updateOneWithKV
       params: [discountAmount]
-      where: id
-    updateCommission:
-      kvFunction: updateOneWithKV
-      params: [commission]
       where: id
     updateCommissionAndDiscount:
       kvFunction: updateOneWithKV
@@ -400,7 +415,7 @@ Ride:
       where: id
     updateCancellationChargesOnCancel:
       kvFunction: updateOneWithKV
-      params: [cancellationChargesOnCancel]
+      params: [cancellationChargesOnCancel, cancellationSettlement]
       where: id
     updateDriverGpsTurnedOff:
       kvFunction: updateOneWithKV

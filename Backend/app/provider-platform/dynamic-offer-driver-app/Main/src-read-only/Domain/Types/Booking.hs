@@ -3,6 +3,8 @@
 
 module Domain.Types.Booking where
 
+import qualified BecknV2.OnDemand.FareBreakup.Tax
+import qualified BecknV2.OnDemand.PaymentCharge
 import Data.Aeson
 import qualified Domain.Types.AddOnConfig
 import qualified Domain.Types.Common
@@ -10,11 +12,13 @@ import qualified Domain.Types.DeliveryPersonDetails
 import qualified Domain.Types.Estimate
 import qualified Domain.Types.Extra.MerchantPaymentMethod
 import qualified Domain.Types.FareParameters
+import qualified Domain.Types.FareSettlement
 import qualified Domain.Types.Location
 import qualified Domain.Types.Merchant
 import qualified Domain.Types.MerchantOperatingCity
 import qualified Domain.Types.MerchantPaymentMethod
 import qualified Domain.Types.ParcelType
+import qualified Domain.Types.PaymentChargeBearer
 import qualified Domain.Types.RiderDetails
 import qualified Domain.Types.SearchTry
 import qualified Domain.Types.Trip
@@ -60,6 +64,7 @@ data Booking = Booking
     estimatedDistance :: Kernel.Prelude.Maybe Kernel.Types.Common.Meters,
     estimatedDuration :: Kernel.Prelude.Maybe Kernel.Types.Common.Seconds,
     estimatedFare :: Kernel.Types.Common.HighPrecMoney,
+    estimatedFareSettlement :: Kernel.Prelude.Maybe Domain.Types.FareSettlement.FareSettlement,
     estimatedStaticDuration :: Kernel.Prelude.Maybe Kernel.Types.Common.Seconds,
     exotelDeclinedCallStatusReceivingTime :: Kernel.Prelude.Maybe Kernel.Prelude.UTCTime,
     fareParams :: Domain.Types.FareParameters.FareParameters,
@@ -88,7 +93,8 @@ data Booking = Booking
     parcelQuantity :: Kernel.Prelude.Maybe Kernel.Prelude.Int,
     parcelType :: Kernel.Prelude.Maybe Domain.Types.ParcelType.ParcelType,
     paymentCharge :: Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney,
-    paymentChargeBearer :: Kernel.Prelude.Maybe Kernel.Prelude.Text,
+    paymentChargeBearer :: Kernel.Prelude.Maybe Domain.Types.PaymentChargeBearer.PaymentChargeBearer,
+    paymentChargeDetails :: Kernel.Prelude.Maybe BecknV2.OnDemand.PaymentCharge.PaymentChargeDetails,
     paymentId :: Kernel.Prelude.Maybe Kernel.Prelude.Text,
     paymentInstrument :: Kernel.Prelude.Maybe Domain.Types.Extra.MerchantPaymentMethod.PaymentInstrument,
     paymentMethodId :: Kernel.Prelude.Maybe (Kernel.Types.Id.Id Domain.Types.MerchantPaymentMethod.MerchantPaymentMethod),
@@ -102,6 +108,7 @@ data Booking = Booking
     receiverDetails :: Kernel.Prelude.Maybe Domain.Types.DeliveryPersonDetails.DeliveryPersonDetails,
     reconciliationStatus :: Kernel.Prelude.Maybe Data.Aeson.Value,
     returnTime :: Kernel.Prelude.Maybe Kernel.Prelude.UTCTime,
+    rideTax :: Kernel.Prelude.Maybe BecknV2.OnDemand.FareBreakup.Tax.RideTax,
     riderId :: Kernel.Prelude.Maybe (Kernel.Types.Id.Id Domain.Types.RiderDetails.RiderDetails),
     riderName :: Kernel.Prelude.Maybe Kernel.Prelude.Text,
     roundTrip :: Kernel.Prelude.Maybe Kernel.Prelude.Bool,

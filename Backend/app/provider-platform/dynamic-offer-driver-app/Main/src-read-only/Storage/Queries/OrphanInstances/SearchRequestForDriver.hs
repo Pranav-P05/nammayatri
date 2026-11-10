@@ -15,6 +15,7 @@ import qualified Kernel.Types.Common
 import Kernel.Types.Error
 import qualified Kernel.Types.Id
 import Kernel.Utils.Common (CacheFlow, EsqDBFlow, MonadFlow, fromMaybeM, getCurrentTime)
+import qualified Kernel.Utils.JSON
 import qualified Kernel.Utils.Version
 import qualified Storage.Beam.SearchRequestForDriver as Beam
 import Storage.Queries.Transformers.SearchRequestForDriver
@@ -37,6 +38,7 @@ instance FromTType' Beam.SearchRequestForDriver Domain.Types.SearchRequestForDri
             backendAppVersion = backendAppVersion,
             backendConfigVersion = backendConfigVersion',
             baseFare = Kernel.Types.Common.mkAmountWithDefault baseFareAmount <$> baseFare,
+            baseFareSettlement = Kernel.Utils.JSON.valueToMaybe =<< baseFareSettlement,
             batchNumber = batchNumber,
             batchingMode = batchingMode,
             cancellationRatio = cancellationRatio,
@@ -129,6 +131,7 @@ instance ToTType' Beam.SearchRequestForDriver Domain.Types.SearchRequestForDrive
         Beam.backendConfigVersion = fmap Kernel.Utils.Version.versionToText backendConfigVersion,
         Beam.baseFare = Kernel.Prelude.roundToIntegral <$> baseFare,
         Beam.baseFareAmount = baseFare,
+        Beam.baseFareSettlement = toJSON <$> baseFareSettlement,
         Beam.batchNumber = batchNumber,
         Beam.batchingMode = batchingMode,
         Beam.cancellationRatio = cancellationRatio,

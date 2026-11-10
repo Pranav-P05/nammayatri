@@ -4,8 +4,11 @@
 
 module Storage.Queries.Ride (module Storage.Queries.Ride, module ReExport) where
 
+import qualified Data.Text
 import qualified Domain.Types.CancellationReason
 import qualified Domain.Types.FarePolicy
+import qualified Domain.Types.FareSettlement
+import qualified Domain.Types.PaymentChargeBearer
 import qualified Domain.Types.Ride
 import qualified Domain.Types.RiderDetails
 import qualified Domain.Types.SubscriptionPurchase
@@ -32,10 +35,17 @@ findByShortId shortId = do findOneWithKV [Se.Is Beam.shortId $ Se.Eq (Kernel.Typ
 updateBapSettled :: (EsqDBFlow m r, MonadFlow m, CacheFlow m r) => (Kernel.Prelude.Maybe Kernel.Prelude.Bool -> Kernel.Types.Id.Id Domain.Types.Ride.Ride -> m ())
 updateBapSettled bapSettled id = do _now <- getCurrentTime; updateOneWithKV [Se.Set Beam.bapSettled bapSettled, Se.Set Beam.updatedAt _now] [Se.Is Beam.id $ Se.Eq (Kernel.Types.Id.getId id)]
 
-updateCancellationChargesOnCancel :: (EsqDBFlow m r, MonadFlow m, CacheFlow m r) => (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney -> Kernel.Types.Id.Id Domain.Types.Ride.Ride -> m ())
-updateCancellationChargesOnCancel cancellationChargesOnCancel id = do
+updateCancellationChargesOnCancel ::
+  (EsqDBFlow m r, MonadFlow m, CacheFlow m r) =>
+  (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney -> Kernel.Prelude.Maybe Domain.Types.FareSettlement.CancellationSettlement -> Kernel.Types.Id.Id Domain.Types.Ride.Ride -> m ())
+updateCancellationChargesOnCancel cancellationChargesOnCancel cancellationSettlement id = do
   _now <- getCurrentTime
-  updateOneWithKV [Se.Set Beam.cancellationChargesOnCancel cancellationChargesOnCancel, Se.Set Beam.updatedAt _now] [Se.Is Beam.id $ Se.Eq (Kernel.Types.Id.getId id)]
+  updateOneWithKV
+    [ Se.Set Beam.cancellationChargesOnCancel cancellationChargesOnCancel,
+      Se.Set Beam.cancellationSettlement (toJSON <$> cancellationSettlement),
+      Se.Set Beam.updatedAt _now
+    ]
+    [Se.Is Beam.id $ Se.Eq (Kernel.Types.Id.getId id)]
 
 updateCancellationDetails ::
   (EsqDBFlow m r, MonadFlow m, CacheFlow m r) =>
@@ -69,19 +79,17 @@ updateCancellationFeeIfCancelledField cancellationFeeIfCancelled id = do
 
 updateCancellationQuoteIfCancelled ::
   (EsqDBFlow m r, MonadFlow m, CacheFlow m r) =>
-  (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney -> Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney -> Kernel.Prelude.Maybe Kernel.Prelude.Text -> Kernel.Types.Id.Id Domain.Types.Ride.Ride -> m ())
-updateCancellationQuoteIfCancelled cancellationFeeIfCancelled cancellationFeeTaxIfCancelled cancellationConsequenceRowIdIfCancelled id = do
+  (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney -> Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney -> Kernel.Prelude.Maybe Domain.Types.FareSettlement.CancellationSettlement -> Kernel.Prelude.Maybe Kernel.Prelude.Text -> Kernel.Types.Id.Id Domain.Types.Ride.Ride -> m ())
+updateCancellationQuoteIfCancelled cancellationFeeIfCancelled cancellationFeeTaxIfCancelled cancellationSettlement cancellationConsequenceRowIdIfCancelled id = do
   _now <- getCurrentTime
   updateOneWithKV
     [ Se.Set Beam.cancellationFeeIfCancelled cancellationFeeIfCancelled,
       Se.Set Beam.cancellationFeeTaxIfCancelled cancellationFeeTaxIfCancelled,
+      Se.Set Beam.cancellationSettlement (toJSON <$> cancellationSettlement),
       Se.Set Beam.cancellationConsequenceRowIdIfCancelled cancellationConsequenceRowIdIfCancelled,
       Se.Set Beam.updatedAt _now
     ]
     [Se.Is Beam.id $ Se.Eq (Kernel.Types.Id.getId id)]
-
-updateCommission :: (EsqDBFlow m r, MonadFlow m, CacheFlow m r) => (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney -> Kernel.Types.Id.Id Domain.Types.Ride.Ride -> m ())
-updateCommission commission id = do _now <- getCurrentTime; updateOneWithKV [Se.Set Beam.commission commission, Se.Set Beam.updatedAt _now] [Se.Is Beam.id $ Se.Eq (Kernel.Types.Id.getId id)]
 
 updateCommissionAndDiscount ::
   (EsqDBFlow m r, MonadFlow m, CacheFlow m r) =>
@@ -154,10 +162,15 @@ updateIsPickupOrDestinationEdited isPickupOrDestinationEdited id = do
 
 updatePaymentCharge ::
   (EsqDBFlow m r, MonadFlow m, CacheFlow m r) =>
-  (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney -> Kernel.Prelude.Maybe Kernel.Prelude.Text -> Kernel.Types.Id.Id Domain.Types.Ride.Ride -> m ())
+  (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney -> Kernel.Prelude.Maybe Domain.Types.PaymentChargeBearer.PaymentChargeBearer -> Kernel.Types.Id.Id Domain.Types.Ride.Ride -> m ())
 updatePaymentCharge paymentCharge paymentChargeBearer id = do
   _now <- getCurrentTime
-  updateOneWithKV [Se.Set Beam.paymentCharge paymentCharge, Se.Set Beam.paymentChargeBearer paymentChargeBearer, Se.Set Beam.updatedAt _now] [Se.Is Beam.id $ Se.Eq (Kernel.Types.Id.getId id)]
+  updateOneWithKV
+    [ Se.Set Beam.paymentCharge paymentCharge,
+      Se.Set Beam.paymentChargeBearer (Data.Text.pack . show <$> paymentChargeBearer),
+      Se.Set Beam.updatedAt _now
+    ]
+    [Se.Is Beam.id $ Se.Eq (Kernel.Types.Id.getId id)]
 
 updatePickupJourney ::
   (EsqDBFlow m r, MonadFlow m, CacheFlow m r) =>

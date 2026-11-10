@@ -8,6 +8,7 @@ import qualified Domain.Types.Common
 import qualified Domain.Types.DriverGoHomeRequest
 import qualified Domain.Types.Estimate
 import qualified Domain.Types.FareParameters
+import qualified Domain.Types.FareSettlement
 import qualified Domain.Types.Merchant
 import qualified Domain.Types.MerchantOperatingCity
 import qualified Domain.Types.Person
@@ -42,6 +43,7 @@ data DriverQuote = DriverQuote
     durationToPickup :: Kernel.Types.Common.Seconds,
     estimateId :: Kernel.Types.Id.Id Domain.Types.Estimate.Estimate,
     estimatedFare :: Kernel.Types.Common.HighPrecMoney,
+    estimatedFareSettlement :: Kernel.Prelude.Maybe Domain.Types.FareSettlement.FareSettlement,
     fareParams :: Domain.Types.FareParameters.FareParameters,
     goHomeRequestId :: Kernel.Prelude.Maybe (Kernel.Types.Id.Id Domain.Types.DriverGoHomeRequest.DriverGoHomeRequest),
     id :: Kernel.Types.Id.Id Domain.Types.DriverQuote.DriverQuote,

@@ -21,6 +21,8 @@ module Domain.Action.Beckn.Select
 where
 
 import qualified Beckn.OnDemand.Transformer.OndcScheduledRide.OnSelect as OSROnSelect
+import BecknV2.OnDemand.PaymentCharge (PaymentChargeDetails)
+import qualified BecknV2.OnDemand.PaymentCharge as PaymentCharge
 import qualified BecknV2.OnDemand.Types as Spec
 import qualified BecknV2.OnDemand.Utils.Common as BUtils
 import Control.Applicative ((<|>))
@@ -34,7 +36,6 @@ import qualified Domain.Types.Extra.MerchantPaymentMethod as DMPM
 import qualified Domain.Types.FareParameters as DFareParams
 import qualified Domain.Types.FarePolicy as DFP
 import qualified Domain.Types.Merchant as DM
-import qualified Domain.Types.MerchantOperatingCity as DMOC
 import qualified Domain.Types.ParcelType as DParcel
 import qualified Domain.Types.Person as DP
 import qualified Domain.Types.Quote as DQuote
@@ -48,6 +49,7 @@ import qualified Kernel.Tools.Metrics.AppMetrics as Metrics
 import Kernel.Types.Error
 import Kernel.Types.Id
 import Kernel.Utils.Common
+import Lib.ConfigPilot.Interface.Types (getOneConfig)
 -- import qualified Lib.Yudhishthira.Event as Yudhishthira
 import qualified Lib.Types.SpecialLocation as SL
 import qualified Lib.Yudhishthira.Tools.DebugLog as LYDL
@@ -56,6 +58,7 @@ import qualified SharedLogic.AddOn as SAddOn
 import SharedLogic.Allocator.Jobs.SendSearchRequestToDrivers (sendSearchRequestToDrivers')
 import qualified SharedLogic.CallBAP as CallBAP
 import SharedLogic.DriverPool
+import qualified SharedLogic.FareCalculator as FC
 import qualified SharedLogic.FarePolicy as SFP
 import qualified SharedLogic.MetricsLabels as SML
 import qualified SharedLogic.RiderDetails as SRD
@@ -65,6 +68,7 @@ import qualified Storage.CachedQueries.BecknConfig as QBC
 import qualified Storage.CachedQueries.Merchant as QMerch
 import qualified Storage.CachedQueries.ValueAddNP as CQVAN
 import qualified Storage.CachedQueries.VehicleServiceTier as CQVST
+import Storage.ConfigPilot.Config.TransporterConfig (TransporterConfigDimensions (..))
 import qualified Storage.Queries.DriverQuote as QDQ
 import qualified Storage.Queries.Estimate as QEst
 import qualified Storage.Queries.FareParameters as QFareParams
@@ -92,6 +96,9 @@ data DSelectReq = DSelectReq
     -- dynamic-offer flow -- this one is the bid's absolute proposed total.
     negotiatedFare :: Maybe HighPrecMoney,
     negativeFareAdjustment :: Maybe HighPrecMoney,
+    paymentChargeDetails :: Maybe PaymentChargeDetails,
+    platformDeductions :: Maybe PaymentCharge.PlatformDeductions,
+    offerDiscountAmount :: Maybe HighPrecMoney,
     isPetRide :: Bool,
     customerPhoneNum :: Maybe Text,
     -- | Customer display name from fulfillment.customer.person (value-add-NP BAPs
@@ -166,7 +173,7 @@ handler merchant sReq searchReq estimates addOnData = do
           petCharges' = if sReq.isPetRide then (.petCharges) =<< estimate.farePolicy else Nothing
           businessDiscount = if sReq.billingCategory == SLT.BUSINESS then fromMaybe 0.0 estimate.businessDiscount else 0.0
           personalDiscount = if sReq.billingCategory == SLT.PERSONAL then fromMaybe 0.0 estimate.personalDiscount else 0.0
-      buildTripQuoteDetail searchReq estimate.tripCategory estimate.vehicleServiceTier estimate.vehicleServiceTierName (estimate.minFare + fromMaybe 0 sReq.customerExtraFee + fromMaybe 0 sReq.negativeFareAdjustment + fromMaybe 0 petCharges' - businessDiscount - personalDiscount) Nothing (mbDriverExtraFeeBounds <&> (.minFee)) (mbDriverExtraFeeBounds <&> (.maxFee)) (mbDriverExtraFeeBounds <&> (.stepFee)) (mbDriverExtraFeeBounds <&> (.defaultStepFee)) driverPickUpCharge driverParkingCharge estimate.id.getId driverAdditionalCharges False ((.congestionCharge) =<< estimate.fareParams) petCharges' (estimate.fareParams >>= (.priorityCharges)) estimate.commissionCharges (estimate.fareParams >>= (.tollCharges)) (estimate.fareParams >>= (.govtCharges)) (estimate.fareParams >>= (.driverCancellationNotAllowed)) (estimate.fareParams >>= (.bufferedFare))
+      buildTripQuoteDetail searchReq estimate.tripCategory estimate.vehicleServiceTier estimate.vehicleServiceTierName estimate.minFare (mbDriverExtraFeeBounds <&> (.minFee)) sReq.customerExtraFee sReq.negativeFareAdjustment businessDiscount personalDiscount Nothing (mbDriverExtraFeeBounds <&> (.minFee)) (mbDriverExtraFeeBounds <&> (.maxFee)) (mbDriverExtraFeeBounds <&> (.stepFee)) (mbDriverExtraFeeBounds <&> (.defaultStepFee)) driverPickUpCharge driverParkingCharge estimate.id.getId driverAdditionalCharges False ((.congestionCharge) =<< estimate.fareParams) petCharges' (estimate.fareParams >>= (.priorityCharges)) estimate.commissionCharges (estimate.fareParams >>= (.tollCharges)) (estimate.fareParams >>= (.govtCharges)) (estimate.fareParams >>= (.driverCancellationNotAllowed)) (estimate.fareParams >>= (.bufferedFare)) estimate.farePolicy estimate.fareParams sReq.paymentChargeDetails sReq.offerDiscountAmount
   let parcelType = (fst sReq.parcelDetails) >>= \rpt -> readMaybe @DParcel.ParcelType $ unpack rpt
       -- Quotes-first airport flow: the picked estimate carries its own gate area (e.g.
       -- Pickup_<slId>_Gate_<gateId>). Refine the SearchRequest.area/pickupGateId from
@@ -185,6 +192,8 @@ handler merchant sReq searchReq estimates addOnData = do
             DSR.parcelQuantity = if isJust parcelType then snd sReq.parcelDetails else searchReq.parcelQuantity,
             DSR.preferSafetyPlus = sReq.preferSafetyPlus,
             DSR.isPetRide = sReq.isPetRide,
+            DSR.commissionDeductedAtPayment = ((.commissionDeductedAtPayment) <$> sReq.platformDeductions) <|> searchReq.commissionDeductedAtPayment,
+            DSR.paymentChargeDeductedAtPayment = ((.paymentChargeDeductedAtPayment) <$> sReq.platformDeductions) <|> searchReq.paymentChargeDeductedAtPayment,
             DSR.area = mbEstimateArea <|> searchReq.area,
             DSR.pickupGateId = mbEstimateGateId <|> searchReq.pickupGateId
           }
@@ -198,6 +207,8 @@ handler merchant sReq searchReq estimates addOnData = do
             tripQuoteDetails,
             customerExtraFee = sReq.customerExtraFee,
             negativeFareAdjustment = sReq.negativeFareAdjustment,
+            paymentChargeDetails = sReq.paymentChargeDetails,
+            buyerOfferDiscount = sReq.offerDiscountAmount,
             messageId = sReq.messageId,
             isRepeatSearch = False,
             billingCategory = sReq.billingCategory,
@@ -265,12 +276,12 @@ validateQuoteSelect merchantId quoteId sReq = do
   searchReq <- QSR.findById quote.searchRequestId >>= fromMaybeM (SearchRequestNotFound quote.searchRequestId.getId)
   unless (searchReq.transactionId == sReq.transactionId) $
     throwError $ InvalidRequest "select transaction_id does not match the search context this quote belongs to"
-  quote' <- applyNegotiatedFare searchReq.merchantOperatingCityId quoteId sReq
+  quote' <- applyNegotiatedFare searchReq quoteId sReq
   return (merchant, searchReq, quote')
 
 -- | Validates and persists whatever /select actually sent -- the negotiated fare tolerance check (if a bid was made) and the add-on selection (if one was made) -- in a single update to the Quote row, instead of two separate ones.
-applyNegotiatedFare :: Id DMOC.MerchantOperatingCity -> Id DQuote.Quote -> DSelectReq -> Flow DQuote.Quote
-applyNegotiatedFare merchantOpCityId quoteId sReq =
+applyNegotiatedFare :: DSR.SearchRequest -> Id DQuote.Quote -> DSelectReq -> Flow DQuote.Quote
+applyNegotiatedFare searchReq quoteId sReq =
   -- Concurrent /select calls on the same quote would race their reads/writes.
   -- This locks per quoteId and re-fetches the quote inside the lock.
   Redis.withWaitAndLockRedis (quoteNegotiationLockKey quoteId.getId) 60 50000 $ do
@@ -295,9 +306,11 @@ applyNegotiatedFare merchantOpCityId quoteId sReq =
               DQuote.fareParams = updatedFareParams,
               DQuote.addOnData = addOnData
             }
+    transporterConfig <- getOneConfig (TransporterConfigDimensions {merchantOperatingCityId = searchReq.merchantOperatingCityId.getId}) Nothing >>= fromMaybeM (TransporterConfigNotFound searchReq.merchantOperatingCityId.getId)
+    let fareSettlement = snd (FC.fareSum ((FC.fareChargeRates transporterConfig quote.farePolicy Nothing Nothing quote.currency) {FC.cancellationDuesCommission = FC.searchCancellationDuesCommission searchReq}) updatedFareParams Nothing)
     QFareParams.updateFareParameters updatedFareParams fareParams.id
-    QQuote.updateEstimatedFareAndAddOnDetails quoteId updatedQuote.estimatedFare updatedQuote.addOnData
-    return updatedQuote
+    QQuote.updateEstimatedFareAndAddOnDetails quoteId (updatedQuote.estimatedFare, fareSettlement) updatedQuote.addOnData
+    return updatedQuote {DQuote.estimatedFareSettlement = Just fareSettlement}
   where
     -- Tolerance lives on the quote's own FarePolicy (per-vehicle-tier), not TransporterConfig (city-level) -- a Sedan and an Auto on the same city can negotiate different bands. Defaults to +-10% when unset on the policy (see DFP.effectiveNegotiationTolerancePct).
     computeNegotiatedFareDelta quote originalFare = case sReq.negotiatedFare of
@@ -317,7 +330,7 @@ applyNegotiatedFare merchantOpCityId quoteId sReq =
 
     computeAddOnData quote
       | Kernel.Prelude.null sReq.addOns = pure [] -- if same request will come which already processed then we should process the latest addOns information not the esisting one
-      | otherwise = SAddOn.resolveAddOnData merchantOpCityId (Just quote.vehicleServiceTier) sReq.addOns
+      | otherwise = SAddOn.resolveAddOnData searchReq.merchantOperatingCityId (Just quote.vehicleServiceTier) sReq.addOns
 
 quoteNegotiationLockKey :: Text -> Text
 quoteNegotiationLockKey id = "Driver:Select:Negotiate:QuoteId-" <> id

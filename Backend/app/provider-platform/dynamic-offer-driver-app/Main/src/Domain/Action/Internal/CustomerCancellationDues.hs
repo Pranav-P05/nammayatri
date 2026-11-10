@@ -101,7 +101,7 @@ getCancellationDuesDetails merchantId _merchantCity apiKey mbIncludeBreakup Canc
       else pure Nothing
   return $
     CancellationDuesDetailsRes
-      { cancellationDues = PriceAPIEntity riderDetails.cancellationDues riderDetails.currency,
+      { cancellationDues = PriceAPIEntity (roundAmountByCurrency' riderDetails.currency riderDetails.cancellationDues) riderDetails.currency,
         cancellationDuesPaid = riderDetails.cancellationDuesPaid,
         noOfTimesCancellationDuesPaid = riderDetails.noOfTimesCanellationDuesPaid,
         waivedOffAmount = riderDetails.waivedOffAmount,
@@ -112,7 +112,7 @@ getCancellationDuesDetails merchantId _merchantCity apiKey mbIncludeBreakup Canc
     mkBreakup row =
       CancellationDueBreakup
         { rideId = row.rideId,
-          dueAmount = PriceAPIEntity row.cancellationAmount row.currency,
+          dueAmount = PriceAPIEntity (roundAmountByCurrency' row.currency row.cancellationAmount) row.currency,
           dueStatus = row.paymentStatus
         }
 

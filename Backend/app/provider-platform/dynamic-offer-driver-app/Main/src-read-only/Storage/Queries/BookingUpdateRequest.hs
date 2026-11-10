@@ -6,6 +6,7 @@ module Storage.Queries.BookingUpdateRequest where
 
 import qualified Domain.Types.Booking
 import qualified Domain.Types.BookingUpdateRequest
+import qualified Domain.Types.FareSettlement
 import Kernel.Beam.Functions
 import Kernel.External.Encryption
 import Kernel.Prelude
@@ -14,6 +15,7 @@ import qualified Kernel.Types.Common
 import Kernel.Types.Error
 import qualified Kernel.Types.Id
 import Kernel.Utils.Common (CacheFlow, EsqDBFlow, MonadFlow, fromMaybeM, getCurrentTime)
+import qualified Kernel.Utils.JSON
 import qualified Sequelize as Se
 import qualified Storage.Beam.BookingUpdateRequest as Beam
 
@@ -46,12 +48,13 @@ findById id = do findOneWithKV [Se.And [Se.Is Beam.id $ Se.Eq (Kernel.Types.Id.g
 
 updateMultipleById ::
   (EsqDBFlow m r, MonadFlow m, CacheFlow m r) =>
-  (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMeters -> Kernel.Types.Common.HighPrecMoney -> Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMeters -> Kernel.Prelude.Maybe Kernel.Prelude.Double -> Kernel.Prelude.Maybe Kernel.Prelude.Double -> Kernel.Types.Id.Id Domain.Types.BookingUpdateRequest.BookingUpdateRequest -> m ())
-updateMultipleById travelledDistance estimatedFare totalDistance currentPointLat currentPointLon id = do
+  (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMeters -> Kernel.Types.Common.HighPrecMoney -> Kernel.Prelude.Maybe Domain.Types.FareSettlement.FareSettlement -> Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMeters -> Kernel.Prelude.Maybe Kernel.Prelude.Double -> Kernel.Prelude.Maybe Kernel.Prelude.Double -> Kernel.Types.Id.Id Domain.Types.BookingUpdateRequest.BookingUpdateRequest -> m ())
+updateMultipleById travelledDistance estimatedFare estimatedFareSettlement totalDistance currentPointLat currentPointLon id = do
   _now <- getCurrentTime
   updateOneWithKV
     [ Se.Set Beam.travelledDistance travelledDistance,
       Se.Set Beam.estimatedFare estimatedFare,
+      Se.Set Beam.estimatedFareSettlement (toJSON <$> estimatedFareSettlement),
       Se.Set Beam.totalDistance totalDistance,
       Se.Set Beam.currentPointLat currentPointLat,
       Se.Set Beam.currentPointLon currentPointLon,
@@ -94,6 +97,7 @@ updateByPrimaryKey (Domain.Types.BookingUpdateRequest.BookingUpdateRequest {..})
       Se.Set Beam.estimatedDistance estimatedDistance,
       Se.Set Beam.estimatedDuration estimatedDuration,
       Se.Set Beam.estimatedFare estimatedFare,
+      Se.Set Beam.estimatedFareSettlement (toJSON <$> estimatedFareSettlement),
       Se.Set Beam.estimatedStaticDuration estimatedStaticDuration,
       Se.Set Beam.fareParamsId (Kernel.Types.Id.getId fareParamsId),
       Se.Set Beam.farePolicyId (Kernel.Types.Id.getId farePolicyId),
@@ -130,6 +134,7 @@ instance FromTType' Beam.BookingUpdateRequest Domain.Types.BookingUpdateRequest.
             estimatedDistance = estimatedDistance,
             estimatedDuration = estimatedDuration,
             estimatedFare = estimatedFare,
+            estimatedFareSettlement = Kernel.Utils.JSON.valueToMaybe =<< estimatedFareSettlement,
             estimatedStaticDuration = estimatedStaticDuration,
             fareParamsId = Kernel.Types.Id.Id fareParamsId,
             farePolicyId = Kernel.Types.Id.Id farePolicyId,
@@ -164,6 +169,7 @@ instance ToTType' Beam.BookingUpdateRequest Domain.Types.BookingUpdateRequest.Bo
         Beam.estimatedDistance = estimatedDistance,
         Beam.estimatedDuration = estimatedDuration,
         Beam.estimatedFare = estimatedFare,
+        Beam.estimatedFareSettlement = toJSON <$> estimatedFareSettlement,
         Beam.estimatedStaticDuration = estimatedStaticDuration,
         Beam.fareParamsId = Kernel.Types.Id.getId fareParamsId,
         Beam.farePolicyId = Kernel.Types.Id.getId farePolicyId,

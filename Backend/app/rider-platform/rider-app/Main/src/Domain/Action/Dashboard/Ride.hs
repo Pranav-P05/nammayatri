@@ -44,7 +44,6 @@ import qualified Data.Text as T
 import qualified Domain.Action.Dashboard.RideFlowDebug as RideFlowDebug
 import Domain.Action.Dashboard.Route (mkGetLocation)
 import qualified Domain.Action.UI.EstimateBP as EstimateBP
-import qualified Domain.SharedLogic.RideDiscount as RD
 import qualified Domain.Types.Booking as DB
 import qualified Domain.Types.Booking as DTB
 import qualified Domain.Types.BookingCancellationReason as DBCReason
@@ -91,6 +90,7 @@ import qualified SharedLogic.BookingDeposit as BookingDeposit
 import qualified SharedLogic.CallBPPInternal as CallBPPInternal
 import SharedLogic.DriverNumber (getDriverMobileNumber)
 import qualified SharedLogic.FareBreakdown as SFareBreakdown
+import qualified SharedLogic.FareBreakupLines as FBL
 import qualified SharedLogic.Finance.RidePayment as RidePaymentFinance
 import SharedLogic.Merchant (findMerchantByShortId)
 import qualified SharedLogic.Offer as SOffer
@@ -562,6 +562,8 @@ mkEntityType = \case
   DFareBreakup.BOOKING -> Common.BOOKING
   DFareBreakup.RIDE -> Common.RIDE
   DFareBreakup.INITIAL_BOOKING -> Common.INITIAL_BOOKING
+  DFareBreakup.ESTIMATE -> Common.ESTIMATE
+  DFareBreakup.QUOTE -> Common.QUOTE
 
 mkFareProductType :: DTB.BookingDetails -> FareProductType
 mkFareProductType bookingDetails = case bookingDetails of
@@ -772,17 +774,15 @@ postRidePayoutOfferSync merchantShortId _ _mbRequestorId req = withDynamicLogLev
               person <- B.runInReplica $ QP.findById booking.riderId >>= fromMaybeM (PersonDoesNotExist booking.riderId.getId)
               totalFare <- ride.totalFare & fromMaybeM (RideFieldNotPresent "totalFare")
               breakups <- QFareBreakup.findAllByEntityIdAndEntityType ride.id.getId DFareBreakup.RIDE
-              let fareCtx = RD.parseProjectFareParamsBreakup $ (\fb -> (fb.description, fb.amount.amount)) <$> breakups
-                  discountApplicableFareAmountTaxIncl = case fareCtx of
-                    Just b -> b.discountApplicableRideFareTaxExclusive + b.discountApplicableRideFareTax
-                    Nothing -> totalFare.amount
+              let fareCtx = FBL.fareLinesFromBreakups totalFare.amount breakups
+                  discountApplicableFareAmountTaxIncl = maybe totalFare.amount FBL.offerBasePrice fareCtx
                   offerBasePrice = mkPrice (Just totalFare.currency) discountApplicableFareAmountTaxIncl
               offerStatsInput <- SPayment.buildOfferStatsInput person
               mbRideOfferEntity <- SOffer.processRideOffer (Just offerStatsInput) booking person ride offerBasePrice fareCtx
               let ridePayoutAmount = maybe 0 (.payoutAmount) mbRideOfferEntity
                   cashLedgerCtx =
                     RidePaymentFinance.applyBookingProviderFieldsToCtx booking $
-                      RidePaymentFinance.buildRiderFinanceCtx person.merchantId.getId person.merchantOperatingCityId.getId totalFare.currency False person.id.getId ride.id.getId Nothing Nothing (listToMaybe $ catMaybes [booking.fromLocation.address.area, booking.fromLocation.address.street, booking.fromLocation.address.city])
+                      RidePaymentFinance.buildRiderFinanceCtx person.merchantId.getId person.merchantOperatingCityId.getId totalFare.currency False person.id.getId ride.id.getId Nothing Nothing (RidePaymentFinance.bookingPickupAddress booking)
               RidePaymentFinance.createSettledCashbackPayoutLeg cashLedgerCtx ridePayoutAmount
               SOffer.scheduleCashbackPayoutJob booking ride person.id ridePayoutAmount
               pure mbRideOfferEntity
@@ -816,6 +816,9 @@ cancellationChargesWaiveOffCore ::
   Flow (Maybe HighPrecMoney, Bool)
 cancellationChargesWaiveOffCore merchant booking ride = do
   case ride.cancellationChargesOnCancel of
+    Just _ | ride.cancellationFeeStatus `elem` [Just DRide.CLEARED, Just DRide.WAIVED] -> do
+      logInfo $ "CancellationChargesWaiveOff: Cancellation fee already " <> show ride.cancellationFeeStatus <> " for bookingId: " <> booking.id.getId
+      pure (Nothing, False)
     Just charges | charges > 0 -> do
       case booking.bppBookingId of
         Just bppBookingId -> do
@@ -825,6 +828,9 @@ cancellationChargesWaiveOffCore merchant booking ride = do
             Right _ -> do
               logInfo $ "CancellationChargesWaiveOff: Successfully waived off cancellation charges for bookingId: " <> booking.id.getId
               QRide.updateCancellationFeeStatus (Just DRide.WAIVED) ride.id
+              cancellationEntries <- filter ((`elem` RidePaymentFinance.cancellationFeeRefTypes) . (.referenceType)) <$> RidePaymentFinance.findUnsettledRidePaymentEntries ride.id.getId
+              unless (null cancellationEntries) $
+                RidePaymentFinance.voidRidePaymentLedger ((.id) <$> cancellationEntries)
               pure (Just charges, True)
             Left err -> do
               logError $ "CancellationChargesWaiveOff: Failed to waive off cancellation charges for bookingId: " <> booking.id.getId <> " with error: " <> show err

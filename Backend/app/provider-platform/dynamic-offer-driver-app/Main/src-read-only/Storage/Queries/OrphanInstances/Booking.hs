@@ -3,6 +3,7 @@
 
 module Storage.Queries.OrphanInstances.Booking where
 
+import qualified Data.Text
 import qualified Domain.Types.Booking
 import Kernel.Beam.Functions
 import Kernel.External.Encryption
@@ -64,6 +65,7 @@ instance FromTType' Beam.Booking Domain.Types.Booking.Booking where
             estimatedDistance = estimatedDistance,
             estimatedDuration = estimatedDuration,
             estimatedFare = estimatedFare,
+            estimatedFareSettlement = Kernel.Utils.JSON.valueToMaybe =<< estimatedFareSettlement,
             estimatedStaticDuration = estimatedStaticDuration,
             exotelDeclinedCallStatusReceivingTime = exotelDeclinedCallStatusReceivingTime,
             fareParams = fareParams',
@@ -92,7 +94,8 @@ instance FromTType' Beam.Booking Domain.Types.Booking.Booking where
             parcelQuantity = parcelQuantity,
             parcelType = parcelType,
             paymentCharge = paymentCharge,
-            paymentChargeBearer = paymentChargeBearer,
+            paymentChargeBearer = paymentChargeBearer >>= (readMaybe . Data.Text.unpack),
+            paymentChargeDetails = Kernel.Utils.JSON.valueToMaybe =<< paymentChargeDetails,
             paymentId = paymentId,
             paymentInstrument = paymentInstrument,
             paymentMethodId = Kernel.Types.Id.Id <$> paymentMethodId,
@@ -106,6 +109,7 @@ instance FromTType' Beam.Booking Domain.Types.Booking.Booking where
             receiverDetails = snd <$> senderAndReceiverDetails,
             reconciliationStatus = reconciliationStatus,
             returnTime = returnTime,
+            rideTax = Kernel.Utils.JSON.valueToMaybe =<< rideTax,
             riderId = Kernel.Types.Id.Id <$> riderId,
             riderName = riderName,
             roundTrip = roundTrip,
@@ -164,6 +168,7 @@ instance ToTType' Beam.Booking Domain.Types.Booking.Booking where
         Beam.estimatedDistance = estimatedDistance,
         Beam.estimatedDuration = estimatedDuration,
         Beam.estimatedFare = estimatedFare,
+        Beam.estimatedFareSettlement = toJSON <$> estimatedFareSettlement,
         Beam.estimatedStaticDuration = estimatedStaticDuration,
         Beam.exotelDeclinedCallStatusReceivingTime = exotelDeclinedCallStatusReceivingTime,
         Beam.fareParametersId = Kernel.Types.Id.getId $ (.id) fareParams,
@@ -192,7 +197,8 @@ instance ToTType' Beam.Booking Domain.Types.Booking.Booking where
         Beam.parcelQuantity = parcelQuantity,
         Beam.parcelType = parcelType,
         Beam.paymentCharge = paymentCharge,
-        Beam.paymentChargeBearer = paymentChargeBearer,
+        Beam.paymentChargeBearer = Data.Text.pack . show <$> paymentChargeBearer,
+        Beam.paymentChargeDetails = toJSON <$> paymentChargeDetails,
         Beam.paymentId = paymentId,
         Beam.paymentInstrument = paymentInstrument,
         Beam.paymentMethodId = Kernel.Types.Id.getId <$> paymentMethodId,
@@ -208,6 +214,7 @@ instance ToTType' Beam.Booking Domain.Types.Booking.Booking where
         Beam.receiverPrimaryExophone = receiverDetails <&> (.primaryExophone),
         Beam.reconciliationStatus = reconciliationStatus,
         Beam.returnTime = returnTime,
+        Beam.rideTax = toJSON <$> rideTax,
         Beam.riderId = Kernel.Types.Id.getId <$> riderId,
         Beam.riderName = riderName,
         Beam.roundTrip = roundTrip,

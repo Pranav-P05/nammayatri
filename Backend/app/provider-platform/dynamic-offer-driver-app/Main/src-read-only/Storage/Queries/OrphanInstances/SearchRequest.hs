@@ -38,7 +38,7 @@ instance FromTType' Beam.SearchRequest Domain.Types.SearchRequest.SearchRequest 
     fromLocation' <- Storage.Queries.Location.findById ((.locationId) fromLocationMapping) >>= fromMaybeM (Tools.Error.FromLocationNotFound ((.getId) $ (.locationId) fromLocationMapping))
     merchantOperatingCityId' <- Storage.CachedQueries.Merchant.MerchantOperatingCity.getMerchantOpCityId (Kernel.Types.Id.Id <$> merchantOperatingCityId) merchant bapCity
     stops' <- Storage.Queries.Transformers.SearchRequest.getStops id hasStops
-    toLocation' <- (maybe (pure Nothing) (Storage.Queries.Location.findById . (.locationId)) mbToLocationMapping)
+    toLocation' <- maybe (pure Nothing) (Storage.Queries.Location.findById . (.locationId)) mbToLocationMapping
     userBundleVersion' <- mapM Kernel.Utils.Version.readVersion (Data.Text.strip <$> userBundleVersion)
     userSdkVersion' <- mapM Kernel.Utils.Version.readVersion (Data.Text.strip <$> userSdkVersion)
     pure $
@@ -51,10 +51,14 @@ instance FromTType' Beam.SearchRequest Domain.Types.SearchRequest.SearchRequest 
             bapId = bapId,
             bapUri = bapUri',
             cloudType = cloudType,
+            commissionDeductedAtPayment = commissionDeductedAtPayment,
             configInExperimentVersions = fromMaybe [] (Kernel.Utils.JSON.valueToMaybe =<< configInExperimentVersions),
             createdAt = createdAt,
             currency = fromMaybe Kernel.Types.Common.INR currency,
             customerCancellationDues = customerCancellationDues,
+            customerCancellationDuesCommission = customerCancellationDuesCommission,
+            customerCancellationDuesCommissionTaxBreakup = Kernel.Utils.JSON.valueToMaybe =<< customerCancellationDuesCommissionTaxBreakup,
+            customerCancellationDuesTaxBreakup = Kernel.Utils.JSON.valueToMaybe =<< customerCancellationDuesTaxBreakup,
             customerLanguage = customerLanguage,
             customerNammaTags = Lib.Yudhishthira.Tools.Utils.tagsNameValueFromTType customerNammaTags,
             device = device,
@@ -85,6 +89,7 @@ instance FromTType' Beam.SearchRequest Domain.Types.SearchRequest.SearchRequest 
             numberOfLuggages = numberOfLuggages,
             parcelQuantity = parcelQuantity,
             parcelType = parcelType,
+            paymentChargeDeductedAtPayment = paymentChargeDeductedAtPayment,
             paymentMode = paymentMode,
             pickupArea = pickupArea,
             pickupGateId = pickupGateId,
@@ -128,10 +133,14 @@ instance ToTType' Beam.SearchRequest Domain.Types.SearchRequest.SearchRequest wh
         Beam.bapId = bapId,
         Beam.bapUri = Kernel.Prelude.showBaseUrl bapUri,
         Beam.cloudType = cloudType,
+        Beam.commissionDeductedAtPayment = commissionDeductedAtPayment,
         Beam.configInExperimentVersions = Just $ toJSON configInExperimentVersions,
         Beam.createdAt = createdAt,
         Beam.currency = Just currency,
         Beam.customerCancellationDues = customerCancellationDues,
+        Beam.customerCancellationDuesCommission = customerCancellationDuesCommission,
+        Beam.customerCancellationDuesCommissionTaxBreakup = toJSON <$> customerCancellationDuesCommissionTaxBreakup,
+        Beam.customerCancellationDuesTaxBreakup = toJSON <$> customerCancellationDuesTaxBreakup,
         Beam.customerLanguage = customerLanguage,
         Beam.customerNammaTags = Lib.Yudhishthira.Tools.Utils.tagsNameValueToTType customerNammaTags,
         Beam.device = device,
@@ -163,6 +172,7 @@ instance ToTType' Beam.SearchRequest Domain.Types.SearchRequest.SearchRequest wh
         Beam.numberOfLuggages = numberOfLuggages,
         Beam.parcelQuantity = parcelQuantity,
         Beam.parcelType = parcelType,
+        Beam.paymentChargeDeductedAtPayment = paymentChargeDeductedAtPayment,
         Beam.paymentMode = paymentMode,
         Beam.pickupArea = pickupArea,
         Beam.pickupGateId = pickupGateId,
@@ -182,7 +192,7 @@ instance ToTType' Beam.SearchRequest Domain.Types.SearchRequest.SearchRequest wh
         Beam.specialLocationTag = specialLocationTag,
         Beam.startTime = Just startTime,
         Beam.toLocGeohash = toLocGeohash,
-        Beam.toLocationId = ((Kernel.Types.Id.getId . (.id)) <$> toLocation),
+        Beam.toLocationId = Kernel.Types.Id.getId . (.id) <$> toLocation,
         Beam.tollCharges = tollCharges,
         Beam.tollIds = tollIds,
         Beam.tollNames = tollNames,

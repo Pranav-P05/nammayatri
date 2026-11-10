@@ -1,4 +1,5 @@
 imports:
+  PaymentChargeBearer: Domain.Types.PaymentChargeBearer
   Merchant: Domain.Types.Merchant
   MerchantOperatingCity: Domain.Types.MerchantOperatingCity
   Version: Kernel.Types.Version
@@ -42,6 +43,7 @@ imports:
   VehicleCategory : BecknV2.OnDemand.Enums
   PaymentMode: Domain.Types.Extra.MerchantPaymentMethod
   ParentSearchRequestLocationInfo: Domain.Types.Extra.Booking
+  RiderFareSettlement: Domain.Types.RiderFareSettlement
 
 BookingLocation:
   tableName: booking_location
@@ -274,7 +276,8 @@ Booking:
     supersededByBookingId: Maybe Text
     commission: Maybe HighPrecMoney
     paymentCharge: Maybe HighPrecMoney
-    paymentChargeBearer: Maybe Text
+    estimatedFareSettlement: Maybe RiderFareSettlement
+    paymentChargeBearer: Maybe PaymentChargeBearer
     paymentMode: Maybe PaymentMode
     dashboardAgentId: Maybe Text
     displayBookingId: Maybe Text
@@ -327,6 +330,7 @@ Booking:
 
   beamInstance: MakeTableInstancesWithTModifier [("bppBookingId", "bpp_ride_booking_id"), ("riderTransactionId", "transaction_id")]
   beamType:
+    paymentChargeBearer: Maybe Text
     discount: Maybe HighPrecMoney
     providerUrl: Text
     estimatedTotalFare: HighPrecMoney
@@ -348,6 +352,7 @@ Booking:
     isPetRide: Maybe Bool
     requiresPaymentBeforeConfirm: Maybe Bool
     parentSearchRequestLocationInfo: Maybe Value
+    estimatedFareSettlement: Maybe Value
 
 
   sqlType:
@@ -401,6 +406,7 @@ Booking:
     displayBookingId: character varying(25)
     requiresPaymentBeforeConfirm: boolean
     parentSearchRequestLocationInfo: jsonb
+    estimatedFareSettlement: json
 
   default:
     fareProductType: "'ONE_WAY'"
@@ -411,6 +417,7 @@ Booking:
 
   # distanceUnit should be the same for all fields
   toTType:
+    paymentChargeBearer: ((Data.Text.pack . show) <$> paymentChargeBearer)|E
     fareProductType: getFareProductType
     toLocationId: getToLocationId
     distance: (Kernel.Utils.Common.distanceToHighPrecMeters <$> distance)|E
@@ -449,6 +456,7 @@ Booking:
     requiresPaymentBeforeConfirm: Kernel.Prelude.Just|I
     billingCategory: Kernel.Prelude.Just billingCategory|E
     parentSearchRequestLocationInfo: fmap toJSON parentSearchRequestLocationInfo|E
+    estimatedFareSettlement: toJSON <$> estimatedFareSettlement|E
 
   intermediateTransformers:
     toTType:
@@ -457,6 +465,7 @@ Booking:
       - mappings: Storage.Queries.LocationMapping.findByEntityId id|EM
       - toBookingDetailsAndFromLocation': Storage.Queries.Transformers.Booking.toBookingDetailsAndFromLocation id merchantId merchantOperatingCityId mappings distance fareProductType tripCategory toLocationId fromLocationId stopLocationId otpCode isUpgradedToCab distanceUnit distanceValue hasStops parcelType parcelQuantity|EM
   fromTType:
+    paymentChargeBearer: (paymentChargeBearer >>= (readMaybe . Data.Text.unpack))|E
     providerUrl: parseBaseUrl providerUrl|EM
     isBookingUpdated: (fromMaybe False isBookingUpdated)|E
     fromLocation: (fst toBookingDetailsAndFromLocation')|E
@@ -483,6 +492,7 @@ Booking:
     requiresPaymentBeforeConfirm: fromMaybe False requiresPaymentBeforeConfirm | E
     billingCategory: Kernel.Prelude.fromMaybe SharedLogic.Type.PERSONAL billingCategory|E
     parentSearchRequestLocationInfo: (Kernel.Utils.JSON.valueToMaybe =<< parentSearchRequestLocationInfo)|E
+    estimatedFareSettlement: Kernel.Utils.JSON.valueToMaybe =<< estimatedFareSettlement|E
 
   extraOperations:
     - EXTRA_QUERY_FILE

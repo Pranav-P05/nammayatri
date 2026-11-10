@@ -19,6 +19,7 @@ import qualified Data.Aeson
 import qualified Data.Time as T
 import qualified Domain.Types as DTC
 import Domain.Types.AddOnConfig (AddOnData)
+import Domain.Types.FareSettlement (FareSettlement)
 import Domain.Types.Quote
 import qualified Domain.Types.SearchRequest as DSR
 import Kernel.Beam.Functions
@@ -46,11 +47,12 @@ findAllBySearchRequestId (Id srId) = findAllWithKV [Se.Is BeamQSZ.searchRequestI
 -- changed at /select, in one write -- rather than two separate updates to
 -- the same row (one from applyNegotiatedFare, one from the add-on check).
 -- Pass the existing value for whichever half didn't change.
-updateEstimatedFareAndAddOnDetails :: (MonadFlow m, EsqDBFlow m r, CacheFlow m r) => Id Quote -> HighPrecMoney -> [AddOnData] -> m ()
-updateEstimatedFareAndAddOnDetails (Id quoteId) estimatedFare addOnData =
+updateEstimatedFareAndAddOnDetails :: (MonadFlow m, EsqDBFlow m r, CacheFlow m r) => Id Quote -> (HighPrecMoney, FareSettlement) -> [AddOnData] -> m ()
+updateEstimatedFareAndAddOnDetails (Id quoteId) (estimatedFare, estimatedFareSettlement) addOnData =
   updateOneWithKV
     [ Se.Set BeamQSZ.estimatedFare $ roundToIntegral estimatedFare,
       Se.Set BeamQSZ.estimatedFareAmount $ Just estimatedFare,
+      Se.Set BeamQSZ.estimatedFareSettlement $ Just (Data.Aeson.toJSON estimatedFareSettlement),
       Se.Set BeamQSZ.addOnData $ Just (Data.Aeson.toJSON addOnData)
     ]
     [Se.Is BeamQSZ.id $ Se.Eq quoteId]
@@ -82,6 +84,7 @@ instance FromTType' BeamQSZ.QuoteSpecialZone Quote where
             distanceUnit = fromMaybe Meter distanceUnit,
             merchantOperatingCityId = Id <$> merchantOperatingCityId,
             addOnData = fromMaybe [] (Kernel.Utils.JSON.valueToMaybe =<< addOnData),
+            estimatedFareSettlement = Kernel.Utils.JSON.valueToMaybe =<< estimatedFareSettlement,
             isDerived = False,
             ..
           }
@@ -103,6 +106,7 @@ instance ToTType' BeamQSZ.QuoteSpecialZone Quote where
         BeamQSZ.validTill = T.utcToLocalTime T.utc validTill,
         BeamQSZ.estimatedFare = roundToIntegral estimatedFare,
         BeamQSZ.estimatedFareAmount = Just estimatedFare,
+        BeamQSZ.estimatedFareSettlement = Data.Aeson.toJSON <$> estimatedFareSettlement,
         BeamQSZ.currency = Just currency,
         BeamQSZ.specialLocationTag = specialLocationTag,
         BeamQSZ.fareParametersId = getId fareParams.id,

@@ -14,6 +14,7 @@ import qualified Kernel.Types.Common
 import Kernel.Types.Error
 import qualified Kernel.Types.Id
 import Kernel.Utils.Common (CacheFlow, EsqDBFlow, MonadFlow, fromMaybeM, getCurrentTime)
+import qualified Kernel.Utils.JSON
 import qualified Kernel.Utils.Version
 import qualified Lib.Yudhishthira.Tools.Utils
 import qualified SharedLogic.Type
@@ -23,10 +24,10 @@ import qualified Storage.Queries.Transformers.Ride
 
 instance FromTType' Beam.Ride Domain.Types.Ride.Ride where
   fromTType' (Beam.RideT {..}) = do
-    backendConfigVersion' <- (mapM Kernel.Utils.Version.readVersion (Data.Text.strip <$> backendConfigVersion))
-    clientBundleVersion' <- (mapM Kernel.Utils.Version.readVersion (Data.Text.strip <$> clientBundleVersion))
-    clientConfigVersion' <- (mapM Kernel.Utils.Version.readVersion (Data.Text.strip <$> clientConfigVersion))
-    clientSdkVersion' <- (mapM Kernel.Utils.Version.readVersion (Data.Text.strip <$> clientSdkVersion))
+    backendConfigVersion' <- mapM Kernel.Utils.Version.readVersion (Data.Text.strip <$> backendConfigVersion)
+    clientBundleVersion' <- mapM Kernel.Utils.Version.readVersion (Data.Text.strip <$> clientBundleVersion)
+    clientConfigVersion' <- mapM Kernel.Utils.Version.readVersion (Data.Text.strip <$> clientConfigVersion)
+    clientSdkVersion' <- mapM Kernel.Utils.Version.readVersion (Data.Text.strip <$> clientSdkVersion)
     fromLocation' <- Storage.Queries.Transformers.Ride.getFromLocation id bookingId merchantId merchantOperatingCityId
     merchantOperatingCityId' <- Storage.Queries.Transformers.Ride.getMerchantOperatingCityId bookingId merchantId merchantOperatingCityId
     stops' <- Storage.Queries.Transformers.Ride.getStops id hasStops
@@ -50,11 +51,12 @@ instance FromTType' Beam.Ride Domain.Types.Ride.Ride where
             cancellationFeeIfCancelled = cancellationFeeIfCancelled,
             cancellationFeeTaxIfCancelled = cancellationFeeTaxIfCancelled,
             cancellationReasonCode = Domain.Types.CancellationReason.CancellationReasonCode <$> cancellationReasonCode,
+            cancellationSettlement = Kernel.Utils.JSON.valueToMaybe =<< cancellationSettlement,
             cancelledBy = cancelledBy,
             chargeableDistance = chargeableDistance,
             clientBundleVersion = clientBundleVersion',
             clientConfigVersion = clientConfigVersion',
-            clientDevice = (Kernel.Utils.Version.mkClientDevice clientOsType clientOsVersion clientModelName clientManufacturer),
+            clientDevice = Kernel.Utils.Version.mkClientDevice clientOsType clientOsVersion clientModelName clientManufacturer,
             clientId = clientId,
             clientSdkVersion = clientSdkVersion',
             cloudType = cloudType,
@@ -86,6 +88,7 @@ instance FromTType' Beam.Ride Domain.Types.Ride.Ride where
             estimatedTollNames = estimatedTollNames,
             fare = fmap (Kernel.Types.Common.mkAmountWithDefault fareAmount) fare,
             fareParametersId = Kernel.Types.Id.Id <$> fareParametersId,
+            fareSettlement = Kernel.Utils.JSON.valueToMaybe =<< fareSettlement,
             finalFarePolicyId = Kernel.Types.Id.Id <$> finalFarePolicyId,
             fleetOwnerId = Kernel.Types.Id.Id <$> fleetOwnerId,
             fromLocation = fromLocation',
@@ -109,7 +112,7 @@ instance FromTType' Beam.Ride Domain.Types.Ride.Ride where
             otp = otp,
             passedThroughDestination = passedThroughDestination,
             paymentCharge = paymentCharge,
-            paymentChargeBearer = paymentChargeBearer,
+            paymentChargeBearer = paymentChargeBearer >>= (readMaybe . Data.Text.unpack),
             pickupBehaviour = pickupBehaviour,
             pickupDarkSeconds = pickupDarkSeconds,
             pickupDistanceCalculationFailed = pickupDistanceCalculationFailed,
@@ -172,14 +175,15 @@ instance ToTType' Beam.Ride Domain.Types.Ride.Ride where
         Beam.cancellationFeeIfCancelled = cancellationFeeIfCancelled,
         Beam.cancellationFeeTaxIfCancelled = cancellationFeeTaxIfCancelled,
         Beam.cancellationReasonCode = (\(Domain.Types.CancellationReason.CancellationReasonCode x) -> x) <$> cancellationReasonCode,
+        Beam.cancellationSettlement = toJSON <$> cancellationSettlement,
         Beam.cancelledBy = cancelledBy,
         Beam.chargeableDistance = chargeableDistance,
         Beam.clientBundleVersion = fmap Kernel.Utils.Version.versionToText clientBundleVersion,
         Beam.clientConfigVersion = fmap Kernel.Utils.Version.versionToText clientConfigVersion,
-        Beam.clientManufacturer = (clientDevice >>= (.deviceManufacturer)),
-        Beam.clientModelName = (clientDevice <&> (.deviceModel)),
-        Beam.clientOsType = (clientDevice <&> (.deviceType)),
-        Beam.clientOsVersion = (clientDevice <&> (.deviceVersion)),
+        Beam.clientManufacturer = clientDevice >>= (.deviceManufacturer),
+        Beam.clientModelName = clientDevice <&> (.deviceModel),
+        Beam.clientOsType = clientDevice <&> (.deviceType),
+        Beam.clientOsVersion = clientDevice <&> (.deviceVersion),
         Beam.clientId = clientId,
         Beam.clientSdkVersion = fmap Kernel.Utils.Version.versionToText clientSdkVersion,
         Beam.cloudType = cloudType,
@@ -214,6 +218,7 @@ instance ToTType' Beam.Ride Domain.Types.Ride.Ride where
         Beam.fare = Kernel.Prelude.fmap roundToIntegral fare,
         Beam.fareAmount = fare,
         Beam.fareParametersId = Kernel.Types.Id.getId <$> fareParametersId,
+        Beam.fareSettlement = toJSON <$> fareSettlement,
         Beam.finalFarePolicyId = Kernel.Types.Id.getId <$> finalFarePolicyId,
         Beam.fleetOwnerId = Kernel.Types.Id.getId <$> fleetOwnerId,
         Beam.hasStops = hasStops,
@@ -236,7 +241,7 @@ instance ToTType' Beam.Ride Domain.Types.Ride.Ride where
         Beam.otp = otp,
         Beam.passedThroughDestination = passedThroughDestination,
         Beam.paymentCharge = paymentCharge,
-        Beam.paymentChargeBearer = paymentChargeBearer,
+        Beam.paymentChargeBearer = Data.Text.pack . show <$> paymentChargeBearer,
         Beam.pickupBehaviour = pickupBehaviour,
         Beam.pickupDarkSeconds = pickupDarkSeconds,
         Beam.pickupDistanceCalculationFailed = pickupDistanceCalculationFailed,

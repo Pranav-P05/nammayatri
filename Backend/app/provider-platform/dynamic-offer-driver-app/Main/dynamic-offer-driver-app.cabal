@@ -555,6 +555,7 @@ library
       Domain.Types.Extra.SharedCab
       Domain.Types.Extra.SurgeConfig
       Domain.Types.Extra.TransporterConfig
+      Domain.Types.FareNetBreakup
       Domain.Types.FareParameters
       Domain.Types.FarePolicy
       Domain.Types.FarePolicy.Common
@@ -570,6 +571,7 @@ library
       Domain.Types.FarePolicy.FarePolicyRentalDetails.FarePolicyRentalDetailsPricingSlabs
       Domain.Types.FarePolicy.FarePolicySlabsDetails
       Domain.Types.FarePolicy.FarePolicySlabsDetails.FarePolicySlabsDetailsSlab
+      Domain.Types.FareSettlement
       Domain.Types.Feedback.FeedbackForm
       Domain.Types.FinancialYear
       Domain.Types.FleetOperatorIncidentType
@@ -679,6 +681,7 @@ library
       SharedLogic.BetterDriverSwap
       SharedLogic.BlockedRouteDetector
       SharedLogic.Booking
+      SharedLogic.BookingFare
       SharedLogic.Cac
       SharedLogic.CallBAP
       SharedLogic.CallBAPInternal
@@ -836,6 +839,7 @@ library
       SharedLogic.RideFeedback.Validation
       SharedLogic.RideFootnotes
       SharedLogic.RiderDetails
+      SharedLogic.RideTax
       SharedLogic.RSFLedger
       SharedLogic.RuleBasedTierUpgrade
       SharedLogic.ScheduledBooking.OverlapCheck

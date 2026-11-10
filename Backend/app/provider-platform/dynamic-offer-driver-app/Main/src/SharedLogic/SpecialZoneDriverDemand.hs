@@ -261,7 +261,6 @@ computeAirportPerKmFare merchantId merchantOpCityId gateLatLong pickupGateId cal
           representativeDuration = Seconds representativeAirportRideDurationSec
       currency <- SMerchant.getCurrencyByMerchantOpCity merchantOpCityId
       distanceUnit <- SMerchant.getDistanceUnitByMerchantOpCity merchantOpCityId
-      mbTransporterConfig <- getOneConfig (TransporterConfigDimensions {merchantOperatingCityId = merchantOpCityId.getId}) Nothing
       now <- getCurrentTime
       fareParams <-
         SFC.calculateFareParameters
@@ -270,6 +269,8 @@ computeAirportPerKmFare merchantId merchantOpCityId gateLatLong pickupGateId cal
               computationPhase = SFC.FCEstimate,
               mbCapConfig = Nothing,
               mbEstimateFareParams = Nothing,
+              paymentChargeDetails = Nothing,
+              buyerOfferDiscount = Nothing,
               actualDistance = Just representativeMeters,
               rideTime = now,
               returnTime = Nothing,
@@ -288,6 +289,7 @@ computeAirportPerKmFare merchantId merchantOpCityId gateLatLong pickupGateId cal
               estimatedCongestionCharge = Nothing,
               isScheduled = False,
               customerCancellationDues = Nothing,
+              customerCancellationDuesTaxBreakup = Nothing,
               nightShiftOverlapChecking = False,
               estimatedDistance = Just representativeMeters,
               estimatedRideDuration = Just representativeDuration,
@@ -300,23 +302,22 @@ computeAirportPerKmFare merchantId merchantOpCityId gateLatLong pickupGateId cal
               shouldApplyBusinessDiscount = False,
               shouldApplyPersonalDiscount = True,
               distanceUnit,
-              merchantOperatingCityId = Just merchantOpCityId,
+              merchantOperatingCityId = merchantOpCityId,
               mbAdditonalChargeCategories = Nothing,
               numberOfLuggages = Nothing,
-              govtChargesRate = mbTransporterConfig <&> (.taxConfig.rideGst),
               pickupGateId = Just pickupGateId,
               fareSettlementType = fullFarePolicy.fareSettlementType,
               isParkingFeeExempt = False
             }
-      let estimatedFare = SFC.fareSum fareParams (Just [])
-          -- Tolls and gate parking (which now includes airport entry fee added by
-          -- applyAirportEntryFee in the V2 path) are flat per-trip reimbursements,
-          -- not earnings per km.
+      let estimatedFare = fst (SFC.fareSum SFC.FareChargeRates {currency = fareParams.currency, commissionChargeConfig = Nothing, rideTax = Nothing, paymentChargeDetails = Nothing, discountAmount = Nothing, cancellationDuesCommission = Nothing, deductedAtPayment = Nothing} fareParams (Just []))
+          amounts = SFC.fareParamsAmounts Nothing fareParams
           excludedFlat =
             fromMaybe 0 fareParams.tollCharges
               + fromMaybe 0 fareParams.tollFareTax
               + fromMaybe 0 fareParams.parkingCharge
               + fromMaybe 0 fareParams.parkingChargeTax
+              + amounts.airportFee
+              + amounts.airportFeeTax
           variableFare = estimatedFare - excludedFlat
           distanceKm :: HighPrecMoney
           distanceKm = HighPrecMoney (toRational representativeAirportRideDistanceMeters / 1000)

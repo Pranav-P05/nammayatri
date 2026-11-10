@@ -24,6 +24,7 @@ import qualified BecknV2.OnDemand.Utils.Common as Utils (computeTtlISO8601)
 import BecknV2.OnDemand.Utils.Constructors
 import qualified BecknV2.OnDemand.Utils.Context as ContextV2
 import BecknV2.OnDemand.Utils.Payment
+import Control.Applicative ((<|>))
 import Control.Lens ((%~))
 import qualified Data.List as L
 import qualified Data.Text as T
@@ -38,6 +39,7 @@ import Kernel.Types.Id
 import Kernel.Utils.Common
 import Lib.ConfigPilot.Interface.Types (getConfig)
 import qualified SharedLogic.MerchantPaymentMethod as SLMPM
+import qualified SharedLogic.PaymentCharge as SPaymentCharge
 import qualified Storage.CachedQueries.Merchant.MerchantOperatingCity as CQMOC
 import Storage.ConfigPilot.Config.BecknConfig (BecknConfigDimensions (..))
 import Storage.ConfigPilot.Config.RiderConfig (RiderConfigDimensions (..))
@@ -153,10 +155,13 @@ mkItemTags res =
             Tags.IS_PET_RIDE Tags.~=? ((T.pack . show) <$> res.isPetRide),
             Tags.BILLING_CATEGORY Tags.~= show res.billingCategory,
             Tags.EMAIL_DOMAIN Tags.~=? res.emailDomain,
-            Tags.CUSTOMER_TIP Tags.~=? ((\charges -> show charges.getMoney) <$> res.customerExtraFee),
+            Tags.CUSTOMER_TIP Tags.~=? (show <$> customerExtraFeeAmount res),
             Tags.NEGATIVE_FARE_ADJUSTMENT Tags.~=? ((\charges -> show charges.getMoney) <$> res.negativeFareAdjustment),
             Tags.OTHER_SELECT_ESTIMATES Tags.~=| (not (null res.remainingEstimateBppIds), show (getId <$> res.remainingEstimateBppIds))
           ]
+            <> SPaymentCharge.paymentChargeDetailsTagList res.paymentChargeDetails
+            <> SPaymentCharge.platformDeductionsTagList res.platformDeductions
+            <> [Tags.DISCOUNT_AMOUNT Tags.~=? (show <$> res.offerDiscountAmount)]
       deliveryTags = mkSelectResDetailsTagGroup res
    in fromMaybe [] baseTags <> deliveryTags
 
@@ -188,12 +193,11 @@ tfPrice res =
 --   BUYER_ADDITIONAL_AMOUNT = just the extra amount (tip/premium).
 tfQuote :: DSelect.DSelectRes -> Maybe Spec.Quotation
 tfQuote res =
-  case res.customerExtraFee of
+  case customerExtraFeeAmount res of
     Nothing -> Nothing
-    Just customerFare ->
+    Just extraFare ->
       let currency = res.estimate.estimatedFare.currency
           baseFare = res.estimate.estimatedFare.amount
-          extraFare = fromIntegral customerFare.getMoney :: HighPrecMoney
           totalProposedFare = baseFare + extraFare
           mkBreakupPrice val =
             Just
@@ -232,6 +236,9 @@ tfQuote res =
                 quotationPrice = quotationPrice,
                 quotationTtl = Nothing
               }
+
+customerExtraFeeAmount :: DSelect.DSelectRes -> Maybe HighPrecMoney
+customerExtraFeeAmount res = ((.amount) <$> res.customerExtraFeeWithCurrency) <|> ((\fee -> fromIntegral fee.getMoney) <$> res.customerExtraFee)
 
 tfPayments :: DSelect.DSelectRes -> BecknConfig -> RiderConfig -> Maybe [Spec.Payment]
 tfPayments res bapConfig riderConfig = do

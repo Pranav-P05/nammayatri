@@ -8,6 +8,7 @@ import qualified Domain.Types.Common
 import qualified Domain.Types.ConditionalCharges
 import qualified Domain.Types.DriverGoHomeRequest
 import qualified Domain.Types.DriverPoolConfig
+import qualified Domain.Types.FareSettlement
 import qualified Domain.Types.Merchant
 import qualified Domain.Types.MerchantOperatingCity
 import qualified Domain.Types.ParcelType
@@ -31,6 +32,7 @@ data SearchRequestForDriver = SearchRequestForDriver
     backendAppVersion :: Kernel.Prelude.Maybe Kernel.Prelude.Text,
     backendConfigVersion :: Kernel.Prelude.Maybe Kernel.Types.Version.Version,
     baseFare :: Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney,
+    baseFareSettlement :: Kernel.Prelude.Maybe Domain.Types.FareSettlement.FareSettlement,
     batchNumber :: Kernel.Prelude.Int,
     batchingMode :: Kernel.Prelude.Maybe Domain.Types.DriverPoolConfig.BatchingMode,
     cancellationRatio :: Kernel.Prelude.Maybe Kernel.Prelude.Double,

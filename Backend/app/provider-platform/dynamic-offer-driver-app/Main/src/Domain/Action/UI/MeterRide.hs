@@ -62,7 +62,7 @@ postMeterRideAddDestination (_mbPersonId, merchantId, merchantOpCityId) rideId m
   fork "update in bap" $ do
     appBackendBapInternal <- asks (.appBackendBapInternal)
     void $ CallBAPInternal.meterRideAddDestination appBackendBapInternal.apiKey appBackendBapInternal.url rideId.getId meterRideRequest
-  void $ QBooking.updateEstimatedDistanceAndFare estimatedFare (Just estimatedDistance) booking.id
+  void $ QBooking.updateEstimatedDistanceAndFare estimatedFare Nothing (Just estimatedDistance) booking.id
   pure $ API.Types.UI.MeterRide.MeterRideAddDestinationResp {..}
 
 buildLocation ::

@@ -24,6 +24,11 @@ create = createWithKV
 createMany :: (EsqDBFlow m r, MonadFlow m, CacheFlow m r) => ([Domain.Types.FareBreakupInfo.FareBreakupInfo] -> m ())
 createMany = traverse_ create
 
+findAllByEntityIdsAndEntityType ::
+  (EsqDBFlow m r, MonadFlow m, CacheFlow m r) =>
+  ([Kernel.Prelude.Text] -> Domain.Types.FareBreakup.FareBreakupEntityType -> m [Domain.Types.FareBreakupInfo.FareBreakupInfo])
+findAllByEntityIdsAndEntityType entityId entityType = do findAllWithKV [Se.And [Se.Is Beam.entityId $ Se.In entityId, Se.Is Beam.entityType $ Se.Eq entityType]]
+
 findByEntityIdAndEntityType ::
   (EsqDBFlow m r, MonadFlow m, CacheFlow m r) =>
   (Kernel.Prelude.Text -> Domain.Types.FareBreakup.FareBreakupEntityType -> m (Maybe Domain.Types.FareBreakupInfo.FareBreakupInfo))

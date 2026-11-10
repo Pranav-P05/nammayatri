@@ -1,0 +1,45 @@
+module SharedLogic.InvoiceBreakupTitles (invoiceBreakupTitles) where
+
+import Kernel.Prelude
+
+invoiceBreakupTitles :: Text -> [(Text, Text)]
+invoiceBreakupTitles govtChargesLabel =
+  [ ("BASE_FARE", "Base Fare"),
+    ("CUSTOMER_SELECTED_FARE", "Customer Selected Fare"),
+    ("DEAD_KILOMETER_FARE", "Dead Kilometer Fare"),
+    ("DISTANCE_FARE", "Distance Fare"),
+    ("DRIVER_SELECTED_FARE", "Driver Selected Fare"),
+    ("EXTRA_TIME_FARE", "Extra Time Fare"),
+    ("FIXED_GOVERNMENT_RATE", govtChargesLabel),
+    ("NIGHT_SHIFT_CHARGE", "Night Shift Charge"),
+    ("RIDE_DURATION_FARE", "Ride duration Fare"),
+    ("PLATFORM_FEE", "Platform Fee"),
+    ("CGST", "CGST"),
+    ("SGST", "SGST"),
+    ("SERVICE_CHARGE", "Service Charge"),
+    ("TIME_BASED_FARE", "Time Based Fare"),
+    ("DIST_BASED_FARE", "Distance Based Fare"),
+    ("EXTRA_DISTANCE_FARE", "Extra Distance Fare"),
+    ("WAITING_OR_PICKUP_CHARGES", "Wating Charge"),
+    ("PARKING_CHARGE", "Parking Charge"),
+    ("TOLL_CHARGES", "Toll Charge"),
+    ("RIDE_STOP_CHARGES", "Ride Stop Charges"),
+    ("PER_STOP_CHARGES", "Per Stop Charges"),
+    ("LUGGAGE_CHARGE", "Luggage Charge"),
+    ("DRIVER_ALLOWANCE", "Driver Allowance"),
+    ("AIRPORT_CONVENIENCE_FEE", "Airport Convenience Fee"),
+    ("RETURN_FEE", "Return Fee"),
+    ("BOOTH_CHARGE", "Booth Charge"),
+    ("SCHEDULING_CHARGE", "Scheduling Charge"),
+    ("RIDE_FARE_TAX", govtChargesLabel),
+    ("TOLL_TAX", "Toll Tax"),
+    ("PARKING_TAX", "Parking Tax"),
+    ("AIRPORT_ENTRY_FEE", "Airport Entry Fee"),
+    ("AIRPORT_ENTRY_FEE_TAX", "Airport Entry Fee Tax"),
+    ("PLATFORM_FEE_CGST", "CGST"),
+    ("PLATFORM_FEE_SGST", "SGST"),
+    ("PLATFORM_FEE_IGST", "IGST"),
+    ("PLATFORM_FEE_VAT", "Platform Fee VAT"),
+    ("PAYMENT_CHARGE", "Payment Charge"),
+    ("PAYMENT_CHARGE_TAX", "Payment Charge Tax")
+  ]

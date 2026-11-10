@@ -67,7 +67,6 @@ buildConfirmReqV2 req isValueAddNP = do
   toAddress <- fulfillment.fulfillmentStops >>= Utils.getDropLocation >>= (.stopLocation) & maybe (pure Nothing) (Utils.parseAddressWithTag fulfillment.fulfillmentTags Tag.DROP_ADDRESS)
   let paymentId = req.confirmReqMessage.confirmReqMessageOrder.orderPayments >>= listToMaybe >>= (.paymentId)
       orderTags = req.confirmReqMessage.confirmReqMessageOrder.orderTags
-      customerDiscountAmount = (Utils.getTag Tag.DISCOUNT_AMOUNT orderTags) >>= (readMaybe . T.unpack) <&> HighPrecMoney
       bookingDepositSecured :: Maybe HighPrecMoney
       bookingDepositSecured = readMaybe . T.unpack =<< Utils.getTag Tag.BOOKING_DEPOSIT_HELD orderTags
   return $

@@ -35,6 +35,7 @@ data QuoteSpecialZoneT f = QuoteSpecialZoneT
     validTill :: B.C f LocalTime,
     estimatedFare :: B.C f Common.Money,
     estimatedFareAmount :: B.C f (Maybe Common.HighPrecMoney),
+    estimatedFareSettlement :: B.C f (Maybe Data.Aeson.Value),
     currency :: B.C f (Maybe Common.Currency),
     specialLocationTag :: B.C f (Maybe Text),
     fareParametersId :: B.C f Text,

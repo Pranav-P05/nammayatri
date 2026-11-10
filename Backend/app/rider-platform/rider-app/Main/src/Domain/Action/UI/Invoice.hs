@@ -21,6 +21,7 @@ import Kernel.Utils.Common
 import qualified Lib.Finance.Domain.Types.Invoice as FinanceInvoice
 import qualified Lib.Finance.Invoice.Service as InvoiceSvc
 import qualified SharedLogic.Finance.RidePayment as RidePaymentFinance
+import SharedLogic.InvoiceBreakupTitles (invoiceBreakupTitles)
 import Storage.Beam.Payment ()
 import qualified Storage.CachedQueries.Merchant as CQM
 import qualified Storage.CachedQueries.Merchant.MerchantOperatingCity as CQMOC
@@ -44,35 +45,7 @@ getInvoice (mbPersonId, merchantId) from to = do
       case mbRide of
         Just ride -> do
           govtChargesLabel <- govtChargesTitle merchant booking
-          let breakupItems =
-                [ ("BASE_FARE", "Base Fare"),
-                  ("CUSTOMER_SELECTED_FARE", "Customer Selected Fare"),
-                  ("DEAD_KILOMETER_FARE", "Dead Kilometer Fare"),
-                  ("DISTANCE_FARE", "Distance Fare"),
-                  ("DRIVER_SELECTED_FARE", "Driver Selected Fare"),
-                  ("EXTRA_TIME_FARE", "Extra Time Fare"),
-                  ("FIXED_GOVERNMENT_RATE", govtChargesLabel),
-                  ("NIGHT_SHIFT_CHARGE", "Night Shift Charge"),
-                  ("RIDE_DURATION_FARE", "Ride duration Fare"),
-                  ("PLATFORM_FEE", "Platform Fee"),
-                  ("CGST", "CGST"),
-                  ("SGST", "SGST"),
-                  ("SERVICE_CHARGE", "Service Charge"),
-                  ("TIME_BASED_FARE", "Time Based Fare"),
-                  ("DIST_BASED_FARE", "Distance Based Fare"),
-                  ("EXTRA_DISTANCE_FARE", "Extra Distance Fare"),
-                  ("WAITING_OR_PICKUP_CHARGES", "Wating Charge"),
-                  ("PARKING_CHARGE", "Parking Charge"),
-                  ("TOLL_CHARGES", "Toll Charge"),
-                  ("RIDE_STOP_CHARGES", "Ride Stop Charges"),
-                  ("PER_STOP_CHARGES", "Per Stop Charges"),
-                  ("LUGGAGE_CHARGE", "Luggage Charge"),
-                  ("DRIVER_ALLOWANCE", "Driver Allowance"),
-                  ("AIRPORT_CONVENIENCE_FEE", "Airport Convenience Fee"),
-                  ("RETURN_FEE", "Return Fee"),
-                  ("BOOTH_CHARGE", "Booth Charge"),
-                  ("SCHEDULING_CHARGE", "Scheduling Charge")
-                ]
+          let breakupItems = invoiceBreakupTitles govtChargesLabel
           mbInfoItems <- CHFBI.findFareBreakupItemsByEntityIdAndType booking.id.getId DFareBreakup.BOOKING booking.createdAt
           fareBreakups <- mapM (getFareBreakup booking mbInfoItems) breakupItems
           gateFeeBreakups <- getGateFeeBreakups booking mbInfoItems

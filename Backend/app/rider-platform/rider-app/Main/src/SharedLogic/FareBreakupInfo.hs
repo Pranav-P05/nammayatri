@@ -1,6 +1,7 @@
 module SharedLogic.FareBreakupInfo
   ( getFareBreakupInfo,
     findFareBreakupItems,
+    findFareBreakupItemsByEntityIds,
     findFareBreakupsFromInfo,
     getFareBreakupsWithFallback,
     fareBreakupToItem,
@@ -44,6 +45,15 @@ findFareBreakupItems ::
   DFareBreakup.FareBreakupEntityType ->
   m (Maybe [FareBreakupInfoItem])
 findFareBreakupItems entityId entityType = fmap (.fareBreakups) <$> getFareBreakupInfo entityId entityType
+
+findFareBreakupItemsByEntityIds ::
+  (EsqDBFlow m r, MonadFlow m, CacheFlow m r) =>
+  [Text] ->
+  DFareBreakup.FareBreakupEntityType ->
+  m (Map.Map Text [FareBreakupInfoItem])
+findFareBreakupItemsByEntityIds entityIds entityType
+  | null entityIds = pure Map.empty
+  | otherwise = Map.fromList . map (\info -> (info.entityId, info.fareBreakups)) <$> QFareBreakupInfo.findAllByEntityIdsAndEntityType entityIds entityType
 
 findFareBreakupsFromInfo ::
   (EsqDBFlow m r, MonadFlow m, CacheFlow m r) =>

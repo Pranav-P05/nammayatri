@@ -89,7 +89,6 @@ data DConfirmReq = DConfirmReq
     paymentId :: Maybe Text,
     enableOtpLessRide :: Bool,
     driverPreference :: Maybe [Text],
-    customerDiscountAmount :: Maybe HighPrecMoney,
     customerLanguage :: Maybe Maps.Language,
     bookingDepositSecured :: Maybe HighPrecMoney,
     -- | A BAP can select more than one add-on on the same item -- empty when
@@ -217,7 +216,7 @@ handler merchant req validatedQuote = do
       let mbDriverExtraFeeBounds = ((,) <$> searchReq.estimatedDistance <*> (join $ (.driverExtraFeeBounds) <$> quote.farePolicy)) <&> \(dist, driverExtraFeeBounds) -> DFP.findDriverExtraFeeBoundsByDistance dist driverExtraFeeBounds
           driverPickUpCharge = join $ USRD.extractDriverPickupCharges <$> ((.farePolicyDetails) <$> quote.farePolicy)
           driverParkingCharge = join $ (.parkingCharge) <$> quote.farePolicy
-      tripQuoteDetail <- buildTripQuoteDetail searchReq booking.tripCategory booking.vehicleServiceTier quote.vehicleServiceTierName booking.estimatedFare (Just booking.isDashboardRequest) (mbDriverExtraFeeBounds <&> (.minFee)) (mbDriverExtraFeeBounds <&> (.maxFee)) (mbDriverExtraFeeBounds <&> (.stepFee)) (mbDriverExtraFeeBounds <&> (.defaultStepFee)) driverPickUpCharge driverParkingCharge quote.id.getId [] False booking.fareParams.congestionCharge booking.fareParams.petCharges booking.fareParams.priorityCharges booking.commission booking.fareParams.tollCharges booking.fareParams.govtCharges booking.fareParams.driverCancellationNotAllowed booking.fareParams.bufferedFare
+      tripQuoteDetail <- buildTripQuoteDetail searchReq booking.tripCategory booking.vehicleServiceTier quote.vehicleServiceTierName booking.estimatedFare Nothing Nothing Nothing 0 0 (Just booking.isDashboardRequest) (mbDriverExtraFeeBounds <&> (.minFee)) (mbDriverExtraFeeBounds <&> (.maxFee)) (mbDriverExtraFeeBounds <&> (.stepFee)) (mbDriverExtraFeeBounds <&> (.defaultStepFee)) driverPickUpCharge driverParkingCharge quote.id.getId [] False booking.fareParams.congestionCharge booking.fareParams.petCharges booking.fareParams.priorityCharges booking.commission booking.fareParams.tollCharges booking.fareParams.govtCharges booking.fareParams.driverCancellationNotAllowed booking.fareParams.bufferedFare quote.farePolicy (Just booking.fareParams) booking.paymentChargeDetails booking.discountAmount
       paymentMethodInfo <- resolveBookingPaymentMethodInfo booking
       let driverSearchBatchInput =
             DriverSearchBatchInput
@@ -227,6 +226,8 @@ handler merchant req validatedQuote = do
                 tripQuoteDetails = [tripQuoteDetail],
                 customerExtraFee = Nothing,
                 negativeFareAdjustment = Nothing,
+                paymentChargeDetails = booking.paymentChargeDetails,
+                buyerOfferDiscount = booking.discountAmount,
                 messageId = booking.id.getId,
                 billingCategory = booking.billingCategory,
                 isRepeatSearch = False,
@@ -259,7 +260,6 @@ handler merchant req validatedQuote = do
         whenJust req.toAddress $ \toAddress -> QL.updateAddress toLocation.id toAddress
       whenJust req.mbRiderName $ QRB.updateRiderName booking.id
       whenJust req.paymentId $ QRB.updatePaymentId booking.id
-      whenJust req.customerDiscountAmount $ QRB.updateDiscountAmount booking.id
       whenJust req.customerLanguage $ QRB.updateCustomerLanguage booking.id
       when (req.bookingDepositSecured /= booking.bookingDeposit) $
         QRB.updateBookingDeposit req.bookingDepositSecured booking.id

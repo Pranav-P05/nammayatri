@@ -178,7 +178,7 @@ prepareDriverPoolBatch cityServiceTiers merchant driverPoolCfg searchReq searchT
       airportEntryFee <-
         if fromMaybe False transporterConfig.airportEntryFeeCheckAtStartRide
           then pure Nothing
-          else AirportEntryFee.requiredDriverWalletAmountForBooking (fromMaybe False transporterConfig.airportEntryFeeEnabled) searchReq.pickupGateId (listToMaybe tripQuoteDetails <&> (.vehicleServiceTier)) mbFareSettlementTypeForPool (Just searchReq.currency)
+          else AirportEntryFee.requiredDriverWalletAmountForBooking transporterConfig searchReq.pickupGateId (listToMaybe tripQuoteDetails <&> (.vehicleServiceTier)) mbFareSettlementTypeForPool (Just searchReq.currency)
       isAirportRequest <- AirportEntryFee.isAirportPickupArea searchReq.area
       blockListedDriversForSearch <- Redis.withCrossAppRedis $ Redis.getList (mkBlockListedDriversKey searchReq.id)
       blockListedDriversForRider <- maybe (pure []) (Redis.withCrossAppRedis . Redis.getList . mkBlockListedDriversForRiderKey) searchReq.riderId
@@ -234,13 +234,21 @@ prepareDriverPoolBatch cityServiceTiers merchant driverPoolCfg searchReq searchT
                   now
           logInfo $
             "TopDrivers: searchTryId=" <> searchTry.id.getId <> " batch=" <> show batchNum
-              <> " qualified=" <> show (length qualifiedDrivers)
-              <> " selected=" <> show (length selected)
-              <> " rules(minRating=" <> show topDriverRules.minRating
-              <> " maxCancellationPct=" <> show topDriverRules.maxCancellationRatePct
-              <> " minRides=" <> show topDriverRules.minCompletedRides
-              <> " radius=" <> show topDriverRules.pickupRadiusMeters
-              <> " usedDefaults=" <> show usedDefaults <> ")"
+              <> " qualified="
+              <> show (length qualifiedDrivers)
+              <> " selected="
+              <> show (length selected)
+              <> " rules(minRating="
+              <> show topDriverRules.minRating
+              <> " maxCancellationPct="
+              <> show topDriverRules.maxCancellationRatePct
+              <> " minRides="
+              <> show topDriverRules.minCompletedRides
+              <> " radius="
+              <> show topDriverRules.pickupRadiusMeters
+              <> " usedDefaults="
+              <> show usedDefaults
+              <> ")"
           fork "publishTopDriversRoundEvent" $ pushToKafka event SRTD.topDriversTopic searchTry.id.getId
 
         addSpecialZonePickupInfo pool = do

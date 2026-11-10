@@ -5,6 +5,7 @@
 module Storage.Queries.Booking (module Storage.Queries.Booking, module ReExport) where
 
 import qualified Domain.Types.Booking
+import qualified Domain.Types.FareSettlement
 import Kernel.Beam.Functions
 import Kernel.External.Encryption
 import Kernel.Prelude
@@ -20,10 +21,16 @@ import Storage.Queries.Transformers.Booking
 
 updateEstimatedDistanceAndFare ::
   (EsqDBFlow m r, MonadFlow m, CacheFlow m r) =>
-  (Kernel.Types.Common.HighPrecMoney -> Kernel.Prelude.Maybe Kernel.Types.Common.Meters -> Kernel.Types.Id.Id Domain.Types.Booking.Booking -> m ())
-updateEstimatedDistanceAndFare estimatedFare estimatedDistance id = do
+  (Kernel.Types.Common.HighPrecMoney -> Kernel.Prelude.Maybe Domain.Types.FareSettlement.FareSettlement -> Kernel.Prelude.Maybe Kernel.Types.Common.Meters -> Kernel.Types.Id.Id Domain.Types.Booking.Booking -> m ())
+updateEstimatedDistanceAndFare estimatedFare estimatedFareSettlement estimatedDistance id = do
   _now <- getCurrentTime
-  updateOneWithKV [Se.Set Beam.estimatedFare estimatedFare, Se.Set Beam.estimatedDistance estimatedDistance, Se.Set Beam.updatedAt _now] [Se.Is Beam.id $ Se.Eq (Kernel.Types.Id.getId id)]
+  updateOneWithKV
+    [ Se.Set Beam.estimatedFare estimatedFare,
+      Se.Set Beam.estimatedFareSettlement (toJSON <$> estimatedFareSettlement),
+      Se.Set Beam.estimatedDistance estimatedDistance,
+      Se.Set Beam.updatedAt _now
+    ]
+    [Se.Is Beam.id $ Se.Eq (Kernel.Types.Id.getId id)]
 
 updateIsPickupOrDestinationEdited :: (EsqDBFlow m r, MonadFlow m, CacheFlow m r) => (Kernel.Prelude.Maybe Kernel.Prelude.Bool -> Kernel.Types.Id.Id Domain.Types.Booking.Booking -> m ())
 updateIsPickupOrDestinationEdited isPickupOrDestinationEdited id = do

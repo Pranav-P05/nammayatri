@@ -85,3 +85,29 @@ ALTER TABLE atlas_driver_offer_bpp.driver_quote ADD COLUMN preference_match_scor
 ------- SQL updates -------
 
 ALTER TABLE atlas_driver_offer_bpp.driver_quote ADD COLUMN is_auto_accepted boolean ;
+
+
+
+------- SQL updates -------
+
+ALTER TABLE atlas_driver_offer_bpp.driver_quote ADD COLUMN estimated_fare_net_breakup json ;
+ALTER TABLE atlas_driver_offer_bpp.driver_quote ADD COLUMN estimated_fare_net double precision ;
+
+
+------- SQL updates -------
+
+ALTER TABLE atlas_driver_offer_bpp.driver_quote ADD COLUMN estimated_fare_settlement json ;
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+

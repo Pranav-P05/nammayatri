@@ -241,3 +241,112 @@ ALTER TABLE atlas_driver_offer_bpp.search_request ADD COLUMN silent_reallocation
 
 ------- SQL updates -------
 
+
+
+
+------- SQL updates -------
+
+ALTER TABLE atlas_driver_offer_bpp.search_request ADD COLUMN customer_cancellation_dues_tax_breakup json ;
+ALTER TABLE atlas_driver_offer_bpp.search_request ADD COLUMN customer_cancellation_dues_commission_tax_breakup json ;
+ALTER TABLE atlas_driver_offer_bpp.search_request ADD COLUMN customer_cancellation_dues_commission double precision ;
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+ALTER TABLE atlas_driver_offer_bpp.search_request ADD COLUMN settle_cancellation_fee_before_next_ride boolean ;
+ALTER TABLE atlas_driver_offer_bpp.search_request ADD COLUMN payment_charge_deducted_at_payment boolean ;
+ALTER TABLE atlas_driver_offer_bpp.search_request ADD COLUMN commission_deducted_at_payment boolean ;
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+

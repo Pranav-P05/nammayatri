@@ -6,12 +6,13 @@ import qualified Data.Aeson as A
 import Data.List.Extra (notNull, sortOn)
 import Data.Ord (Down (..))
 import qualified Data.Time as DT
+import Database.Beam.Postgres (Postgres)
 import qualified Domain.Types as DTC
 import qualified Domain.Types as DVST
 import Domain.Types.Booking
 import Domain.Types.DriverQuote as DDQ
 import qualified Domain.Types.Extra.MerchantPaymentMethod as DMPM
-import qualified Domain.Types.FareParameters as DFP
+import Domain.Types.FareSettlement (FareSettlement)
 import qualified Domain.Types.LocationMapping as DLM
 import Domain.Types.Merchant
 import qualified Domain.Types.MerchantOperatingCity as DMOC
@@ -147,6 +148,30 @@ updateReallocationReset newQuoteId newStartTime newIsScheduled bookingId = do
 -- driver/tier-dependent field from the re-priced in-mem booking so a cross-tier takeover (a multi-tier
 -- search try can reassign to a different tier) can't leave stale tier/toll/safety/distance. The caller
 -- builds the record (needs fare policy, config, and the tier lookup); this is the single write.
+bookingFareSets :: Booking -> [Se.Set Postgres BeamB.BookingT]
+bookingFareSets booking =
+  [ Se.Set BeamB.estimatedFare booking.estimatedFare,
+    Se.Set BeamB.estimatedFareSettlement (toJSON <$> booking.estimatedFareSettlement),
+    Se.Set BeamB.fareParametersId (getId booking.fareParams.id),
+    Se.Set BeamB.estimatedCongestionCharge booking.estimatedCongestionCharge,
+    Se.Set BeamB.commission booking.commission,
+    Se.Set BeamB.cancellationCommission booking.cancellationCommission,
+    Se.Set BeamB.paymentCharge booking.paymentCharge,
+    Se.Set BeamB.paymentChargeBearer (show <$> booking.paymentChargeBearer),
+    Se.Set BeamB.isPetRide (Just booking.isPetRide),
+    Se.Set BeamB.isSafetyPlus (Just booking.isSafetyPlus),
+    Se.Set BeamB.bookingDeposit booking.bookingDeposit,
+    Se.Set BeamB.rideTax (toJSON <$> booking.rideTax),
+    Se.Set BeamB.discountAmount booking.discountAmount
+  ]
+
+updateBookingFare :: (MonadFlow m, EsqDBFlow m r, CacheFlow m r) => Booking -> m ()
+updateBookingFare booking = do
+  now <- getCurrentTime
+  updateOneWithKV
+    (bookingFareSets booking <> [Se.Set BeamB.updatedAt now])
+    [Se.Is BeamB.id (Se.Eq $ getId booking.id)]
+
 updateReallocationResetDynamic ::
   (MonadFlow m, EsqDBFlow m r, CacheFlow m r) =>
   Booking ->
@@ -154,33 +179,26 @@ updateReallocationResetDynamic ::
   m ()
 updateReallocationResetDynamic booking now =
   updateOneWithKV
-    [ Se.Set BeamB.quoteId booking.quoteId,
-      Se.Set BeamB.estimatedFare booking.estimatedFare,
-      Se.Set BeamB.fareParametersId (getId booking.fareParams.id),
-      Se.Set BeamB.estimatedCongestionCharge booking.estimatedCongestionCharge,
-      Se.Set BeamB.commission booking.commission,
-      Se.Set BeamB.cancellationCommission booking.cancellationCommission,
-      Se.Set BeamB.paymentCharge booking.paymentCharge,
-      Se.Set BeamB.paymentChargeBearer booking.paymentChargeBearer,
-      Se.Set BeamB.isPetRide (Just booking.isPetRide),
-      Se.Set BeamB.vehicleVariant booking.vehicleServiceTier,
-      Se.Set BeamB.vehicleServiceTierName (Just booking.vehicleServiceTierName),
-      Se.Set BeamB.vehicleServiceTierSeatingCapacity booking.vehicleServiceTierSeatingCapacity,
-      Se.Set BeamB.vehicleServiceTierAirConditioned booking.vehicleServiceTierAirConditioned,
-      Se.Set BeamB.isAirConditioned booking.isAirConditioned,
-      Se.Set BeamB.isSafetyPlus (Just booking.isSafetyPlus),
-      Se.Set BeamB.distanceToPickup (realToFrac <$> booking.distanceToPickup),
-      Se.Set BeamB.tollCharges booking.tollCharges,
-      Se.Set BeamB.tollIds booking.tollIds,
-      Se.Set BeamB.tollNames booking.tollNames,
-      Se.Set BeamB.coinsRewardedOnGoldTierRide booking.coinsRewardedOnGoldTierRide,
-      Se.Set BeamB.preferenceMatchScore booking.preferenceMatchScore,
-      Se.Set BeamB.isAutoAccepted booking.isAutoAccepted,
-      Se.Set BeamB.dqDurationToPickup booking.dqDurationToPickup,
-      Se.Set BeamB.status booking.status,
-      Se.Set BeamB.startTime booking.startTime,
-      Se.Set BeamB.updatedAt now
-    ]
+    ( bookingFareSets booking
+        <> [ Se.Set BeamB.quoteId booking.quoteId,
+             Se.Set BeamB.vehicleVariant booking.vehicleServiceTier,
+             Se.Set BeamB.vehicleServiceTierName (Just booking.vehicleServiceTierName),
+             Se.Set BeamB.vehicleServiceTierSeatingCapacity booking.vehicleServiceTierSeatingCapacity,
+             Se.Set BeamB.vehicleServiceTierAirConditioned booking.vehicleServiceTierAirConditioned,
+             Se.Set BeamB.isAirConditioned booking.isAirConditioned,
+             Se.Set BeamB.distanceToPickup (realToFrac <$> booking.distanceToPickup),
+             Se.Set BeamB.tollCharges booking.tollCharges,
+             Se.Set BeamB.tollIds booking.tollIds,
+             Se.Set BeamB.tollNames booking.tollNames,
+             Se.Set BeamB.coinsRewardedOnGoldTierRide booking.coinsRewardedOnGoldTierRide,
+             Se.Set BeamB.preferenceMatchScore booking.preferenceMatchScore,
+             Se.Set BeamB.isAutoAccepted booking.isAutoAccepted,
+             Se.Set BeamB.dqDurationToPickup booking.dqDurationToPickup,
+             Se.Set BeamB.status booking.status,
+             Se.Set BeamB.startTime booking.startTime,
+             Se.Set BeamB.updatedAt now
+           ]
+    )
     [Se.Is BeamB.id (Se.Eq $ getId booking.id)]
 
 updateStop :: (MonadFlow m, EsqDBFlow m r) => Id Booking -> Maybe Text -> m ()
@@ -216,14 +234,15 @@ updateRiderName bookingId riderName = do
   now <- getCurrentTime
   updateOneWithKV [Se.Set BeamB.riderName $ Just riderName, Se.Set BeamB.updatedAt now] [Se.Is BeamB.id (Se.Eq $ getId bookingId)]
 
-updateMultipleById :: (MonadFlow m, EsqDBFlow m r, CacheFlow m r) => HighPrecMoney -> Maybe HighPrecMeters -> Maybe Meters -> Maybe Seconds -> Maybe Seconds -> Text -> Id Booking -> m ()
-updateMultipleById estimatedFare maxEstimatedDistance estimatedDistance mbEstimatedDuration estimatedStaticDuration fareParametersId bookingId = do
+updateMultipleById :: (MonadFlow m, EsqDBFlow m r, CacheFlow m r) => (HighPrecMoney, Maybe FareSettlement) -> Maybe HighPrecMeters -> Maybe Meters -> Maybe Seconds -> Maybe Seconds -> Text -> Id Booking -> m ()
+updateMultipleById (estimatedFare, mbFareSettlement) maxEstimatedDistance estimatedDistance mbEstimatedDuration estimatedStaticDuration fareParametersId bookingId = do
   now <- getCurrentTime
   let durationSets = case mbEstimatedDuration of
         Just estimatedDuration -> [Se.Set BeamB.estimatedDuration (Just estimatedDuration), Se.Set BeamB.estimatedStaticDuration estimatedStaticDuration]
         Nothing -> []
   updateOneWithKV
     ( [ Se.Set BeamB.estimatedFare estimatedFare,
+        Se.Set BeamB.estimatedFareSettlement (toJSON <$> mbFareSettlement),
         Se.Set BeamB.maxEstimatedDistance maxEstimatedDistance,
         Se.Set BeamB.estimatedDistance estimatedDistance,
         Se.Set BeamB.fareParametersId fareParametersId,
@@ -233,22 +252,24 @@ updateMultipleById estimatedFare maxEstimatedDistance estimatedDistance mbEstima
     )
     [Se.Is BeamB.id (Se.Eq $ getId bookingId)]
 
-updateVehicleServiceTierAndFare :: (MonadFlow m, EsqDBFlow m r, CacheFlow m r) => Id Booking -> DVST.ServiceTierType -> Id DFP.FareParameters -> HighPrecMoney -> Maybe Text -> Text -> Maybe Double -> Maybe Int -> Maybe Bool -> Maybe HighPrecMoney -> m ()
-updateVehicleServiceTierAndFare bookingId newServiceTier fareParamsId newEstimatedFare mbTierName newQuoteId mbAirConditioned mbSeatingCapacity mbIsAC mbNewCongestionCharge = do
+updateVehicleServiceTierAndFare :: (MonadFlow m, EsqDBFlow m r, CacheFlow m r) => Booking -> m ()
+updateVehicleServiceTierAndFare booking = do
   now <- getCurrentTime
-  let baseSets =
-        [ Se.Set BeamB.vehicleVariant newServiceTier,
-          Se.Set BeamB.fareParametersId (getId fareParamsId),
-          Se.Set BeamB.estimatedFare newEstimatedFare,
-          Se.Set BeamB.vehicleServiceTierName mbTierName,
-          Se.Set BeamB.quoteId newQuoteId,
-          Se.Set BeamB.estimatedCongestionCharge mbNewCongestionCharge,
-          Se.Set BeamB.updatedAt now
-        ]
-      acSets = maybe [] (\ac -> [Se.Set BeamB.vehicleServiceTierAirConditioned (Just ac)]) mbAirConditioned
-      seatSets = maybe [] (\s -> [Se.Set BeamB.vehicleServiceTierSeatingCapacity (Just s)]) mbSeatingCapacity
-      isACSets = maybe [] (\ac -> [Se.Set BeamB.isAirConditioned (Just ac)]) mbIsAC
-  updateOneWithKV (baseSets <> acSets <> seatSets <> isACSets) [Se.Is BeamB.id (Se.Eq $ getId bookingId)]
+  updateOneWithKV
+    ( bookingFareSets booking
+        <> [ Se.Set BeamB.vehicleVariant booking.vehicleServiceTier,
+             Se.Set BeamB.vehicleServiceTierName (Just booking.vehicleServiceTierName),
+             Se.Set BeamB.quoteId booking.quoteId,
+             Se.Set BeamB.vehicleServiceTierAirConditioned booking.vehicleServiceTierAirConditioned,
+             Se.Set BeamB.vehicleServiceTierSeatingCapacity booking.vehicleServiceTierSeatingCapacity,
+             Se.Set BeamB.isAirConditioned booking.isAirConditioned,
+             Se.Set BeamB.tollCharges booking.tollCharges,
+             Se.Set BeamB.tollIds booking.tollIds,
+             Se.Set BeamB.tollNames booking.tollNames,
+             Se.Set BeamB.updatedAt now
+           ]
+    )
+    [Se.Is BeamB.id (Se.Eq $ getId booking.id)]
 
 updateSpecialZoneOtpCode :: (MonadFlow m, EsqDBFlow m r, CacheFlow m r) => Id Booking -> Text -> m ()
 updateSpecialZoneOtpCode bookingId specialZoneOtpCode = do
@@ -257,22 +278,12 @@ updateSpecialZoneOtpCode bookingId specialZoneOtpCode = do
     [Se.Set BeamB.specialZoneOtpCode $ Just specialZoneOtpCode, Se.Set BeamB.updatedAt now]
     [Se.Is BeamB.id (Se.Eq $ getId bookingId)]
 
-updateNumberOfLuggagesAndFare ::
-  (MonadFlow m, EsqDBFlow m r, CacheFlow m r) =>
-  Id Booking ->
-  Maybe Int ->
-  Id DFP.FareParameters ->
-  HighPrecMoney ->
-  m ()
-updateNumberOfLuggagesAndFare bookingId mbNumberOfLuggages fareParamsId newEstimatedFare = do
+updateNumberOfLuggagesAndFare :: (MonadFlow m, EsqDBFlow m r, CacheFlow m r) => Booking -> m ()
+updateNumberOfLuggagesAndFare booking = do
   now <- getCurrentTime
   updateOneWithKV
-    [ Se.Set BeamB.numberOfLuggages mbNumberOfLuggages,
-      Se.Set BeamB.fareParametersId (getId fareParamsId),
-      Se.Set BeamB.estimatedFare newEstimatedFare,
-      Se.Set BeamB.updatedAt now
-    ]
-    [Se.Is BeamB.id (Se.Eq $ getId bookingId)]
+    (bookingFareSets booking <> [Se.Set BeamB.numberOfLuggages booking.numberOfLuggages, Se.Set BeamB.updatedAt now])
+    [Se.Is BeamB.id (Se.Eq $ getId booking.id)]
 
 findStuckBookings ::
   (MonadFlow m, EsqDBFlow m r, CacheFlow m r) =>
@@ -368,13 +379,6 @@ updatePaymentId bookingId paymentId = do
   now <- getCurrentTime
   updateOneWithKV
     [Se.Set BeamB.paymentId $ Just paymentId, Se.Set BeamB.updatedAt now]
-    [Se.Is BeamB.id (Se.Eq $ getId bookingId)]
-
-updateDiscountAmount :: (MonadFlow m, EsqDBFlow m r, CacheFlow m r) => Id Booking -> HighPrecMoney -> m ()
-updateDiscountAmount bookingId discount = do
-  now <- getCurrentTime
-  updateOneWithKV
-    [Se.Set BeamB.discountAmount $ Just discount, Se.Set BeamB.updatedAt now]
     [Se.Is BeamB.id (Se.Eq $ getId bookingId)]
 
 updateBookingDeposit :: (MonadFlow m, EsqDBFlow m r, CacheFlow m r) => Maybe HighPrecMoney -> Id Booking -> m ()

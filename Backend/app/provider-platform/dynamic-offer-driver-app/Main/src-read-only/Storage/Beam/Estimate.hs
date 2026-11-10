@@ -3,6 +3,7 @@
 
 module Storage.Beam.Estimate where
 
+import qualified Data.Aeson
 import qualified Database.Beam as B
 import Domain.Types.Common ()
 import qualified Domain.Types.Common
@@ -41,6 +42,7 @@ data EstimateT f = EstimateT
     isScheduled :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Bool),
     maxFare :: B.C f Kernel.Types.Common.Money,
     maxFareAmount :: B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney),
+    maxFareSettlement :: B.C f (Kernel.Prelude.Maybe Data.Aeson.Value),
     mbActualQARCity :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Double),
     mbActualQARCityPast :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Double),
     mbActualQARFromLocGeohash :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Double),
@@ -57,6 +59,7 @@ data EstimateT f = EstimateT
     merchantOperatingCityId :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Text),
     minFare :: B.C f Kernel.Types.Common.Money,
     minFareAmount :: B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney),
+    minFareSettlement :: B.C f (Kernel.Prelude.Maybe Data.Aeson.Value),
     navigationInstruction :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Text),
     negativeFareSuggestion :: B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney),
     personalDiscount :: B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney),

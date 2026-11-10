@@ -3,6 +3,7 @@
 
 module Storage.Beam.Ride where
 
+import qualified Data.Aeson
 import qualified Database.Beam as B
 import Domain.Types.Common ()
 import qualified Domain.Types.Common
@@ -19,20 +20,21 @@ import qualified SharedLogic.Type
 import Tools.Beam.UtilsTH
 
 data RideT f = RideT
-  { backendAppVersion :: (B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Text)),
-    backendConfigVersion :: (B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Text)),
-    bapSettled :: (B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Bool)),
-    billingCategory :: (B.C f (Kernel.Prelude.Maybe SharedLogic.Type.BillingCategory)),
-    bookingId :: (B.C f Kernel.Prelude.Text),
+  { backendAppVersion :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Text),
+    backendConfigVersion :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Text),
+    bapSettled :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Bool),
+    billingCategory :: B.C f (Kernel.Prelude.Maybe SharedLogic.Type.BillingCategory),
+    bookingId :: B.C f Kernel.Prelude.Text,
     cancellationAdditionalInfo :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Text),
-    cancellationChargesOnCancel :: (B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney)),
-    cancellationCommission :: (B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney)),
-    cancellationConsequenceRowIdIfCancelled :: (B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Text)),
-    cancellationFaultRule :: (B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Text)),
-    cancellationFaultVerdict :: (B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Text)),
-    cancellationFeeIfCancelled :: (B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney)),
-    cancellationFeeTaxIfCancelled :: (B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney)),
+    cancellationChargesOnCancel :: B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney),
+    cancellationCommission :: B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney),
+    cancellationConsequenceRowIdIfCancelled :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Text),
+    cancellationFaultRule :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Text),
+    cancellationFaultVerdict :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Text),
+    cancellationFeeIfCancelled :: B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney),
+    cancellationFeeTaxIfCancelled :: B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney),
     cancellationReasonCode :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Text),
+    cancellationSettlement :: B.C f (Kernel.Prelude.Maybe Data.Aeson.Value),
     cancelledBy :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Text),
     chargeableDistance :: B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.Meters),
     clientBundleVersion :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Text),
@@ -75,6 +77,7 @@ data RideT f = RideT
     fare :: B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.Money),
     fareAmount :: B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney),
     fareParametersId :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Text),
+    fareSettlement :: B.C f (Kernel.Prelude.Maybe Data.Aeson.Value),
     finalFarePolicyId :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Text),
     fleetOwnerId :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Text),
     hasStops :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Bool),
@@ -152,6 +155,6 @@ instance B.Table RideT where
 
 type Ride = RideT Identity
 
-$(enableKVPG (''RideT) [('id)] [[('bookingId)], [('driverGoHomeRequestId)], [('driverId)], [('fleetOwnerId)], [('shortId)]])
+$(enableKVPG ''RideT ['id] [['bookingId], ['driverGoHomeRequestId], ['driverId], ['fleetOwnerId], ['shortId]])
 
-$(mkTableInstances (''RideT) "ride")
+$(mkTableInstances ''RideT "ride")

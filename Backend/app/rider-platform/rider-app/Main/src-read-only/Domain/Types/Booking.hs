@@ -16,9 +16,11 @@ import qualified Domain.Types.Location
 import qualified Domain.Types.Merchant
 import qualified Domain.Types.MerchantOperatingCity
 import qualified Domain.Types.ParcelType
+import qualified Domain.Types.PaymentChargeBearer
 import qualified Domain.Types.Person
 import qualified Domain.Types.Quote
 import qualified Domain.Types.RecentLocation
+import qualified Domain.Types.RiderFareSettlement
 import qualified Domain.Types.ServiceTierType
 import qualified Domain.Types.Trip
 import qualified Kernel.External.Payment.Interface.Types
@@ -60,6 +62,7 @@ data Booking = Booking
     estimatedDistance :: Kernel.Prelude.Maybe Kernel.Types.Common.Distance,
     estimatedDuration :: Kernel.Prelude.Maybe Kernel.Types.Common.Seconds,
     estimatedFare :: Kernel.Types.Common.Price,
+    estimatedFareSettlement :: Kernel.Prelude.Maybe Domain.Types.RiderFareSettlement.RiderFareSettlement,
     estimatedStaticDuration :: Kernel.Prelude.Maybe Kernel.Types.Common.Seconds,
     estimatedTotalFare :: Kernel.Types.Common.Price,
     fareSettlementType :: Kernel.Prelude.Maybe Lib.Types.SpecialLocation.FareSettlementType,
@@ -88,7 +91,7 @@ data Booking = Booking
     offersFraudCheckFailureReason :: Kernel.Prelude.Maybe Kernel.Prelude.Text,
     parentSearchRequestLocationInfo :: Kernel.Prelude.Maybe Domain.Types.Extra.Booking.ParentSearchRequestLocationInfo,
     paymentCharge :: Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney,
-    paymentChargeBearer :: Kernel.Prelude.Maybe Kernel.Prelude.Text,
+    paymentChargeBearer :: Kernel.Prelude.Maybe Domain.Types.PaymentChargeBearer.PaymentChargeBearer,
     paymentInstrument :: Kernel.Prelude.Maybe Domain.Types.Extra.MerchantPaymentMethod.PaymentInstrument,
     paymentMethodId :: Kernel.Prelude.Maybe Kernel.External.Payment.Interface.Types.PaymentMethodId,
     paymentMode :: Kernel.Prelude.Maybe Domain.Types.Extra.MerchantPaymentMethod.PaymentMode,

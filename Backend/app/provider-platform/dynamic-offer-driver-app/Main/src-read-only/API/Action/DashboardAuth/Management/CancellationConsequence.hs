@@ -28,35 +28,35 @@ type API = ("cancellationConsequence" :> (GetCancellationConsequenceList :<|> Po
 
 type GetCancellationConsequenceList =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/CANCELLATION_CONSEQUENCE/GET_CANCELLATION_CONSEQUENCE_LIST"
       :> API.Types.ProviderPlatform.Management.CancellationConsequence.GetCancellationConsequenceList
   )
 
 type PostCancellationConsequenceCreate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/CANCELLATION_CONSEQUENCE/POST_CANCELLATION_CONSEQUENCE_CREATE"
       :> API.Types.ProviderPlatform.Management.CancellationConsequence.PostCancellationConsequenceCreate
   )
 
 type PostCancellationConsequenceUpdate =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/CANCELLATION_CONSEQUENCE/POST_CANCELLATION_CONSEQUENCE_UPDATE"
       :> API.Types.ProviderPlatform.Management.CancellationConsequence.PostCancellationConsequenceUpdate
   )
 
 type GetCancellationConsequenceRegistryList =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/CANCELLATION_CONSEQUENCE/GET_CANCELLATION_CONSEQUENCE_REGISTRY_LIST"
       :> API.Types.ProviderPlatform.Management.CancellationConsequence.GetCancellationConsequenceRegistryList
   )
 
 type PostCancellationConsequenceRegistryUpsert =
   ( DashboardUserAuth
-      'DRIVER_OFFER_BPP_MANAGEMENT
+      ('DRIVER_OFFER_BPP_MANAGEMENT)
       "PROVIDER_MANAGEMENT/CANCELLATION_CONSEQUENCE/POST_CANCELLATION_CONSEQUENCE_REGISTRY_UPSERT"
       :> API.Types.ProviderPlatform.Management.CancellationConsequence.PostCancellationConsequenceRegistryUpsert
   )
@@ -64,7 +64,7 @@ type PostCancellationConsequenceRegistryUpsert =
 handler :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> Environment.FlowServer API)
 handler merchantId city = getCancellationConsequenceList merchantId city :<|> postCancellationConsequenceCreate merchantId city :<|> postCancellationConsequenceUpdate merchantId city :<|> getCancellationConsequenceRegistryList merchantId city :<|> postCancellationConsequenceRegistryUpsert merchantId city
 
-getCancellationConsequenceList :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Prelude.Maybe Kernel.Prelude.Int -> Kernel.Prelude.Maybe Kernel.Prelude.Int -> Environment.FlowHandler API.Types.ProviderPlatform.Management.CancellationConsequence.CancellationConsequenceListRes)
+getCancellationConsequenceList :: (Kernel.Types.Id.ShortId Domain.Types.Merchant.Merchant -> Kernel.Types.Beckn.Context.City -> DashboardUser -> Kernel.Prelude.Maybe (Kernel.Prelude.Int) -> Kernel.Prelude.Maybe (Kernel.Prelude.Int) -> Environment.FlowHandler API.Types.ProviderPlatform.Management.CancellationConsequence.CancellationConsequenceListRes)
 getCancellationConsequenceList a5 a4 a3 a2 a1 =
   withDashboardFlowHandlerAPI $
     ( do

@@ -201,3 +201,31 @@ ALTER TABLE atlas_driver_offer_bpp.estimate ADD COLUMN negative_fare_suggestion 
 
 ALTER TABLE atlas_driver_offer_bpp.estimate ADD COLUMN fare_adjustment_id text ;
 ALTER TABLE atlas_driver_offer_bpp.estimate ADD COLUMN fare_adjustment_arm text ;
+
+
+------- SQL updates -------
+
+ALTER TABLE atlas_driver_offer_bpp.estimate ADD COLUMN min_fare_net_breakup json ;
+ALTER TABLE atlas_driver_offer_bpp.estimate ADD COLUMN min_fare_net double precision ;
+ALTER TABLE atlas_driver_offer_bpp.estimate ADD COLUMN max_fare_net_breakup json ;
+ALTER TABLE atlas_driver_offer_bpp.estimate ADD COLUMN max_fare_net double precision ;
+
+
+------- SQL updates -------
+
+ALTER TABLE atlas_driver_offer_bpp.estimate ADD COLUMN min_fare_settlement json ;
+ALTER TABLE atlas_driver_offer_bpp.estimate ADD COLUMN max_fare_settlement json ;
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+
+
+
+
+------- SQL updates -------
+

@@ -1,4 +1,6 @@
 imports:
+  PaymentChargeBearer: Domain.Types.PaymentChargeBearer
+  FareSettlement: Domain.Types.FareSettlement
   TripCategory: Domain.Types.Common
   Area: Lib.Types.SpecialLocation
   Merchant: Domain.Types.Merchant
@@ -26,6 +28,9 @@ imports:
   FareSettlementType: Lib.Types.SpecialLocation
   Language: Tools.Maps
   AddOnData: Domain.Types.AddOnConfig
+  RideTax: BecknV2.OnDemand.FareBreakup.Tax
+  PaymentChargeDetails: BecknV2.OnDemand.PaymentCharge
+  TaxBreakup: BecknV2.OnDemand.FareBreakup.Tax
 
 Booking:
   derives: "Generic,Show,FromJSON,ToJSON"
@@ -120,7 +125,7 @@ Booking:
     commission: Maybe HighPrecMoney
     cancellationCommission: Maybe HighPrecMoney
     paymentCharge: Maybe HighPrecMoney
-    paymentChargeBearer: Maybe Text
+    paymentChargeBearer: Maybe PaymentChargeBearer
     discountAmount: Maybe HighPrecMoney
     displayBookingId: Maybe Text
     searchTryId: Maybe (Id SearchTry)
@@ -132,11 +137,15 @@ Booking:
     businessEmailDomain: Maybe Text
     customerLanguage: Maybe Language
     addOnData: "[AddOnData]"
+    rideTax: Maybe RideTax
+    paymentChargeDetails: Maybe PaymentChargeDetails
+    estimatedFareSettlement: Maybe FareSettlement
 
   excludedFields:
     - merchantId
 
   beamType:
+    paymentChargeBearer: Maybe Text
     currency: Maybe Currency
     tripCategory: Maybe TripCategory
     riderId: Maybe Text
@@ -151,11 +160,14 @@ Booking:
     isDashboardRequest: Maybe Bool
     configInExperimentVersions: Maybe Value
     addOnData: Maybe Value
+    rideTax: Maybe Value
+    paymentChargeDetails: Maybe Value
     isSafetyPlus : Maybe Bool
     isInsured: Maybe Bool
     isPetRide: Maybe Bool
     billingCategory: Maybe BillingCategory
     searchTryId: Maybe Text
+    estimatedFareSettlement: Maybe Value
 
   beamFields:
     tripCategory:
@@ -180,6 +192,7 @@ Booking:
       receiverPrimaryExophone: Maybe Text
 
   toTType:
+    paymentChargeBearer: ((Data.Text.pack . show) <$> paymentChargeBearer)|E
     currency: Just currency|E
     tripCategory: (Just tripCategory)|E
     vehicleServiceTierName: (Just vehicleServiceTierName)|E
@@ -202,12 +215,15 @@ Booking:
     receiverPrimaryExophone: (receiverDetails <&> (.primaryExophone))|E
     configInExperimentVersions: Just $ toJSON configInExperimentVersions|E
     addOnData: Just $ toJSON addOnData|E
+    rideTax: toJSON <$> rideTax|E
+    paymentChargeDetails: toJSON <$> paymentChargeDetails|E
     isSafetyPlus : Just isSafetyPlus|E
     isInsured: Just isInsured|E
     isPetRide: Just isPetRide|E
     billingCategory: Just billingCategory|E
     searchTryId: (Kernel.Types.Id.getId <$> searchTryId)|E
     pickupGateId: pickupGateId|E
+    estimatedFareSettlement: toJSON <$> estimatedFareSettlement|E
 
   intermediateTransformers:
     fromTType:
@@ -216,6 +232,7 @@ Booking:
       - merchant: Storage.CachedQueries.Merchant.findById (Kernel.Types.Id.Id providerId) >>= fromMaybeM (Kernel.Types.Error.MerchantNotFound providerId)|EM
       - senderAndReceiverDetails: Storage.Queries.Transformers.Booking.getSenderAndReceiverDetails tripCategory senderId senderName senderPrimaryExophone receiverId receiverName receiverPrimaryExophone|EM
   fromTType:
+    paymentChargeBearer: (paymentChargeBearer >>= (readMaybe . Data.Text.unpack))|E
     currency: fromMaybe Kernel.Types.Common.INR currency|E
     tripCategory: getTripCategory
     merchantOperatingCityId: Storage.CachedQueries.Merchant.MerchantOperatingCity.getMerchantOpCityId (Kernel.Types.Id.Id <$> merchantOperatingCityId) merchant bapCity|EM
@@ -234,12 +251,15 @@ Booking:
     receiverDetails: snd <$> senderAndReceiverDetails|E
     configInExperimentVersions: fromMaybe [] (Kernel.Utils.JSON.valueToMaybe =<< configInExperimentVersions)|E
     addOnData: fromMaybe [] (Kernel.Utils.JSON.valueToMaybe =<< addOnData)|E
+    rideTax: Kernel.Utils.JSON.valueToMaybe =<< rideTax|E
+    paymentChargeDetails: Kernel.Utils.JSON.valueToMaybe =<< paymentChargeDetails|E
     isSafetyPlus: fromMaybe False isSafetyPlus|E
     isInsured: fromMaybe False isInsured|E
     isPetRide: fromMaybe False isPetRide|E
     billingCategory: fromMaybe SharedLogic.Type.PERSONAL billingCategory|E
     searchTryId: Kernel.Types.Id.Id <$> searchTryId|E
     pickupGateId: pickupGateId|E
+    estimatedFareSettlement: Kernel.Utils.JSON.valueToMaybe =<< estimatedFareSettlement|E
 
   sqlType:
     status: character varying(255)
@@ -265,10 +285,13 @@ Booking:
     estimateId: character varying(255)
     configInExperimentVersions: "json"
     addOnData: "json"
+    rideTax: "json"
+    paymentChargeDetails: "json"
     displayBookingId: character varying(25)
     searchTryId: character varying(36)
     dqDurationToPickup: bigint
     pickupGateId: character varying(36)
+    estimatedFareSettlement: "json"
 
   default:
     bookingType: "'NormalBooking'"
@@ -276,7 +299,7 @@ Booking:
   queries:
     updateEstimatedDistanceAndFare:
       kvFunction: updateOneWithKV
-      params: [estimatedFare, estimatedDistance]
+      params: [estimatedFare, estimatedFareSettlement, estimatedDistance]
       where: id
     updateIsPickupOrDestinationEdited:
       kvFunction: updateOneWithKV

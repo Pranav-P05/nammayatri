@@ -41,9 +41,13 @@ where
 import qualified API.Types.UI.Payment as PaymentAPI
 import qualified Beckn.ACL.Cancel as CancelACL
 import qualified Beckn.ACL.Confirm as ACL
-import qualified BecknV2.OnDemand.Enums as Enums
-import Control.Applicative ((<|>))
 -- import Data.Aeson (defaultOptions, withObject, (.:?))
+
+-- TODO: Uncomment when PaytmEDC module is available in shared-kernel
+-- import qualified Kernel.External.Payment.PaytmEDC.Checksum as PaytmEDCChecksum
+
+import qualified BecknV2.OnDemand.FareBreakup.Core as FB
+import Control.Applicative ((<|>))
 import Data.Aeson.Types ()
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.OpenApi ()
@@ -55,15 +59,11 @@ import qualified Domain.Action.UI.FRFSTicketService as FRFSTicketService
 import qualified Domain.Action.UI.ParkingBooking as ParkingBooking
 import qualified Domain.Action.UI.Pass as Pass
 import qualified Domain.Action.UI.RidePayment as DRidePayment
-import qualified Domain.SharedLogic.RideDiscount as RD
 import qualified Domain.Types.Booking as DRB
 import qualified Domain.Types.BookingCancellationReason as SBCR
 import qualified Domain.Types.BookingPayment as DBP
 import qualified Domain.Types.BookingStatus as SRB
 import Domain.Types.CancellationReason (CancellationReasonCode (..), CancellationStage (..))
--- TODO: Uncomment when PaytmEDC module is available in shared-kernel
--- import qualified Kernel.External.Payment.PaytmEDC.Checksum as PaytmEDCChecksum
-
 import Domain.Types.Extra.MerchantPaymentMethod ()
 import qualified Domain.Types.Extra.MerchantPaymentMethod as DMPM
 import qualified Domain.Types.FareBreakup as DFareBreakup
@@ -119,6 +119,7 @@ import qualified SharedLogic.FareBreakupInfo as SFareBreakupInfo
 import qualified SharedLogic.Finance.Rails as FinanceRails
 import qualified SharedLogic.Finance.RidePayment as RidePaymentFinance
 import qualified SharedLogic.Payment as SPayment
+import qualified SharedLogic.RiderFareSettlement as SRFS
 import qualified SharedLogic.Utils as SLUtils
 import Storage.Beam.Payment ()
 import qualified Storage.CachedQueries.Merchant as CQM
@@ -224,9 +225,10 @@ createRideBookingPaymentOrder booking = do
             booking.id.getId
             DFareBreakup.BOOKING
             (QFareBreakup.findAllByEntityIdAndEntityType booking.id.getId DFareBreakup.BOOKING)
-        let resolvedParkingAmount = case RD.parseProjectFareParamsBreakup ((\b -> (b.description, b.amount.amount)) <$> breakups) of
-              Just b -> b.parkingChargeTaxExclusive + b.parkingChargeTax
-              Nothing -> sumByDescription (show Enums.PARKING_CHARGE) breakups
+        let resolvedParkingAmount =
+              if null breakups
+                then 0
+                else uncurry (+) ((FB.componentLines (map (\fb -> FB.BreakupLine fb.description fb.amount.amount) breakups)).parking)
         when (resolvedParkingAmount == 0) $
           logError $
             "createRideBookingPaymentOrder: resolved parking amount is 0 for bookingId="
@@ -235,7 +237,7 @@ createRideBookingPaymentOrder booking = do
               <> show booking.fareSettlementType
         pure resolvedParkingAmount
       else pure 0
-  let commissionAmount = fromMaybe 0 booking.commission
+  let commissionAmount = fromMaybe 0 (SRFS.bookingCommission booking)
       amount = case booking.fareSettlementType of
         Just SL.CommissionOnly -> commissionAmount
         Just SL.ParkingOnly -> parkingAmount
@@ -693,11 +695,7 @@ resumeBookingDepositConfirm bookingId = do
     Left () -> logInfo $ "Booking fee confirm resume for " <> bookingIdText <> " skipped: another resumer holds the lock"
     Right mbConfirmFor -> whenJust mbConfirmFor $ sendWithheldConfirm bookingId
 
--- | Sum fare breakup line items matching an exact description (fallback path when the breakup
---   isn't in the canonical V2 tax-slot shape parseProjectFareParamsBreakup expects).
-sumByDescription :: Text -> [DFareBreakup.FareBreakup] -> HighPrecMoney
-sumByDescription description_ = sum . map (.amount.amount) . filter ((== description_) . (.description))
-
+-- | Sum fare breakup line items matching an exact description
 isTerminalStatus :: Payment.TransactionStatus -> Bool
 isTerminalStatus = \case
   Payment.CHARGED -> True
@@ -1328,8 +1326,9 @@ stripeWebhookAction paymentMode merchantOperatingCityId resp respDump = do
                           Right () -> logInfo $ "Settled " <> show (length entryIds) <> " pending ledger entries via webhook for ride: " <> rideId
                           Left err -> logError $ "Webhook failed to settle ledger entries for ride " <> rideId <> ": " <> show err
                     KPayment.CANCELLED -> do
-                      RidePaymentFinance.voidRidePaymentLedger entryIds
-                      logInfo $ "Voided " <> show (length entryIds) <> " pending ledger entries via webhook for ride: " <> rideId
+                      pendingOnly <- map (.id) <$> RidePaymentFinance.findPendingRidePaymentEntries rideId
+                      RidePaymentFinance.voidRidePaymentLedger pendingOnly
+                      logInfo $ "Voided " <> show (length pendingOnly) <> " pending ledger entries via webhook for ride: " <> rideId
                     _ -> pure ()
         pure ackResp
       _ -> DPayment.stripeWebhookService commonMerchantOperatingCityId resp respDump stripeWebhookData

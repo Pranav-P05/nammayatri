@@ -16,10 +16,9 @@ module Beckn.ACL.OnInit (buildOnInitReqV2) where
 
 import Beckn.ACL.Common as ACL
 import qualified Beckn.OnDemand.Utils.Common as Utils
-import qualified BecknV2.OnDemand.Tags as Tags
+import qualified BecknV2.OnDemand.FareSettlement as FS
 import qualified BecknV2.OnDemand.Types as Spec
 import qualified BecknV2.OnDemand.Utils.Context as ContextV2
-import qualified BecknV2.Utils as BecknV2Utils
 import qualified Data.Text as T
 import qualified Data.UUID as UUID
 import qualified Domain.Action.Beckn.OnInit as DOnInit
@@ -27,7 +26,6 @@ import Domain.Types.Booking (BPPBooking, Booking)
 import Kernel.Prelude
 import qualified Kernel.Types.Beckn.Context as Context
 import qualified Kernel.Types.Beckn.DecimalValue as DecimalValue
-import qualified Kernel.Types.Common as Common
 import Kernel.Types.Id
 import Kernel.Utils.Common
 import Tools.Error
@@ -45,9 +43,7 @@ buildOnInitReqV2 req = do
     let order = message.confirmReqMessageOrder
     fareParamsQuotationBreakup <- order.orderQuote >>= (.quotationBreakup) & fromMaybeM (InvalidRequest "Missing Quote Breakups.")
     let fareBreakups = mapMaybe ACL.mkDFareBreakup fareParamsQuotationBreakup
-        commission = extractCommissionFromPaymentTags order.orderPayments
-        paymentCharge = extractHighPrecTagFromPaymentTags Tags.PAYMENT_CHARGE order.orderPayments
-        paymentChargeBearer = extractTextTagFromPaymentTags Tags.PAYMENT_CHARGE_BEARER order.orderPayments
+        settlementTags = FS.settlementFromTags (order.orderPayments >>= listToMaybe >>= (.paymentTags))
     case parsedData of
       Left err -> throwError . InvalidBecknSchema $ "on_init req," <> "on_init error: " <> show err
       Right (bookingId, bppBookingId, estimatedFare, paymentId, currency) -> do
@@ -57,9 +53,11 @@ buildOnInitReqV2 req = do
               { estimatedFare = Utils.decimalValueToPrice currency estimatedFare,
                 discount = Nothing, -- TODO : replace when actual discount logic is implemented
                 paymentUrl = Nothing, -- TODO check with ONDC
-                commission = commission,
-                paymentCharge = paymentCharge,
-                paymentChargeBearer = paymentChargeBearer,
+                commission = settlementTags.commission,
+                commissionTaxBreakup = settlementTags.commissionTaxBreakup,
+                paymentCharge = settlementTags.paymentCharge,
+                paymentChargeTaxBreakup = settlementTags.paymentChargeTaxBreakup,
+                paymentChargeBearer = (.bearer) <$> settlementTags.paymentChargeDetails,
                 ..
               }
   where
@@ -99,25 +97,6 @@ buildOnInitReqV2 req = do
 
     parseDecimalValue :: Text -> Maybe DecimalValue.DecimalValue
     parseDecimalValue = DecimalValue.valueFromString
-
-    extractCommissionFromPaymentTags :: Maybe [Spec.Payment] -> Maybe Common.HighPrecMoney
-    extractCommissionFromPaymentTags mbPayments = do
-      payments <- mbPayments
-      payment <- listToMaybe payments
-      paymentTags <- payment.paymentTags
-      commissionText <- BecknV2Utils.getTag Tags.COMMISSION (Just paymentTags)
-      Common.highPrecMoneyFromText commissionText
-
-    extractTextTagFromPaymentTags :: Tags.BecknTag -> Maybe [Spec.Payment] -> Maybe Text
-    extractTextTagFromPaymentTags tagName mbPayments = do
-      payments <- mbPayments
-      payment <- listToMaybe payments
-      paymentTags <- payment.paymentTags
-      BecknV2Utils.getTag tagName (Just paymentTags)
-
-    extractHighPrecTagFromPaymentTags :: Tags.BecknTag -> Maybe [Spec.Payment] -> Maybe Common.HighPrecMoney
-    extractHighPrecTagFromPaymentTags tagName mbPayments =
-      extractTextTagFromPaymentTags tagName mbPayments >>= Common.highPrecMoneyFromText
 
 handleErrorV2 ::
   (MonadFlow m) =>

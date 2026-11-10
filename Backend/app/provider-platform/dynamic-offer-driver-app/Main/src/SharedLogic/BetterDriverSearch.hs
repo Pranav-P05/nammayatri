@@ -154,7 +154,9 @@ startBetterDriverSearch merchant booking ride = do
             businessEmailDomain = searchTry.businessEmailDomain,
             driverPreference = searchTry.driverPreference,
             addOnData = searchTry.addOnData,
-            betterDriverSearchForBookingId = Just booking.id
+            betterDriverSearchForBookingId = Just booking.id,
+            paymentChargeDetails = searchTry.paymentChargeDetails,
+            buyerOfferDiscount = searchTry.discountAmount
           }
   newSearchTry <- initiateDriverSearchBatch driverSearchBatchInput
   JC.createJobIn @_ @'CheckBetterDriverSearchProximity (Just merchant.id) (Just booking.merchantOperatingCityId) betterDriverSearchProximityInitialDelaySec $
@@ -212,4 +214,4 @@ startBetterDriverSearch merchant booking ride = do
           driverParkingCharge = join $ (.parkingCharge) <$> estimate.farePolicy
           businessDiscount = if searchTry.billingCategory == SLT.BUSINESS then fromMaybe 0.0 estimate.businessDiscount else 0.0
           personalDiscount = if searchTry.billingCategory == SLT.PERSONAL then fromMaybe 0.0 estimate.personalDiscount else 0.0
-      buildTripQuoteDetail searchReq estimate.tripCategory estimate.vehicleServiceTier estimate.vehicleServiceTierName (estimate.minFare + fromMaybe 0 searchTry.customerExtraFee + fromMaybe 0 searchTry.petCharges - businessDiscount - personalDiscount) (Just booking.isDashboardRequest) (mbDriverExtraFeeBounds <&> (.minFee)) (mbDriverExtraFeeBounds <&> (.maxFee)) (mbDriverExtraFeeBounds <&> (.stepFee)) (mbDriverExtraFeeBounds <&> (.defaultStepFee)) driverPickUpCharge driverParkingCharge estimate.id.getId conditionalCharges False ((.congestionCharge) =<< estimate.fareParams) searchTry.petCharges (estimate.fareParams >>= (.priorityCharges)) estimate.commissionCharges booking.fareParams.tollCharges booking.fareParams.govtCharges booking.fareParams.driverCancellationNotAllowed booking.fareParams.bufferedFare
+      buildTripQuoteDetail searchReq estimate.tripCategory estimate.vehicleServiceTier estimate.vehicleServiceTierName estimate.minFare (mbDriverExtraFeeBounds <&> (.minFee)) searchTry.customerExtraFee Nothing businessDiscount personalDiscount (Just booking.isDashboardRequest) (mbDriverExtraFeeBounds <&> (.minFee)) (mbDriverExtraFeeBounds <&> (.maxFee)) (mbDriverExtraFeeBounds <&> (.stepFee)) (mbDriverExtraFeeBounds <&> (.defaultStepFee)) driverPickUpCharge driverParkingCharge estimate.id.getId conditionalCharges False ((.congestionCharge) =<< estimate.fareParams) searchTry.petCharges (estimate.fareParams >>= (.priorityCharges)) estimate.commissionCharges booking.fareParams.tollCharges booking.fareParams.govtCharges booking.fareParams.driverCancellationNotAllowed booking.fareParams.bufferedFare estimate.farePolicy estimate.fareParams searchTry.paymentChargeDetails searchTry.discountAmount

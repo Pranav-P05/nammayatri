@@ -15,7 +15,9 @@ import qualified Domain.Types.Location as DL
 import qualified Domain.Types.LocationMapping as DLM
 import Domain.Types.Merchant as DM
 import qualified Domain.Types.MerchantOperatingCity as DMOC
+import Domain.Types.PaymentChargeBearer (PaymentChargeBearer)
 import Domain.Types.Person (Person)
+import Domain.Types.RiderFareSettlement (RiderFareSettlement)
 import qualified EulerHS.Language as L
 import EulerHS.Prelude (forM_, whenNothingM_)
 import Kernel.Beam.Functions
@@ -337,12 +339,21 @@ updateCommission rbId mbCommission = do
     ]
     [Se.Is BeamB.id (Se.Eq $ getId rbId)]
 
-updatePaymentCharge :: (MonadFlow m, EsqDBFlow m r) => Id Booking -> Maybe HighPrecMoney -> Maybe Text -> m ()
+updatePaymentCharge :: (MonadFlow m, EsqDBFlow m r) => Id Booking -> Maybe HighPrecMoney -> Maybe PaymentChargeBearer -> m ()
 updatePaymentCharge rbId mbPaymentCharge mbPaymentChargeBearer = do
   now <- getCurrentTime
   updateOneWithKV
     [ Se.Set BeamB.paymentCharge mbPaymentCharge,
-      Se.Set BeamB.paymentChargeBearer mbPaymentChargeBearer,
+      Se.Set BeamB.paymentChargeBearer (show <$> mbPaymentChargeBearer),
+      Se.Set BeamB.updatedAt now
+    ]
+    [Se.Is BeamB.id (Se.Eq $ getId rbId)]
+
+updateFareSettlement :: (MonadFlow m, EsqDBFlow m r) => Id Booking -> Maybe RiderFareSettlement -> m ()
+updateFareSettlement rbId mbFareSettlement = do
+  now <- getCurrentTime
+  updateOneWithKV
+    [ Se.Set BeamB.estimatedFareSettlement (toJSON <$> mbFareSettlement),
       Se.Set BeamB.updatedAt now
     ]
     [Se.Is BeamB.id (Se.Eq $ getId rbId)]

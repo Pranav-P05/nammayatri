@@ -26,6 +26,7 @@ module SharedLogic.OneShotAssign
   )
 where
 
+import qualified BecknV2.OnDemand.PaymentCharge as PaymentCharge
 import qualified Domain.Action.Beckn.Init as DInit
 import qualified Domain.Action.UI.Person as SP
 import qualified Domain.Action.UI.Ride as DRideUI
@@ -67,6 +68,7 @@ import qualified Storage.CachedQueries.ValueAddNP as CQVAN
 import Storage.ConfigPilot.Config.Exophone (ExophoneDimensions (..))
 import qualified Storage.Queries.Booking as QRB
 import qualified Storage.Queries.DriverInformation as QDI
+import qualified Storage.Queries.FareParameters as QFP
 import qualified Storage.Queries.FleetDriverAssociation as QFDA
 import qualified Storage.Queries.RiderDetails as QRD
 import qualified Storage.Queries.SearchTry as QST
@@ -111,7 +113,9 @@ oneShotAssign OneShotAssignReq {..} = do
               isInsured = Nothing,
               insuredAmount = Nothing,
               displayBookingId = Nothing,
-              discountAmount = Nothing,
+              discountAmount = searchTry.discountAmount,
+              paymentChargeDetails = searchTry.paymentChargeDetails,
+              platformDeductions = PaymentCharge.PlatformDeductions <$> searchReq.commissionDeductedAtPayment <*> searchReq.paymentChargeDeductedAtPayment,
               initialStatus = DRB.TRIP_ASSIGNED,
               riderId = searchReq.riderId,
               riderName = searchReq.riderName
@@ -120,6 +124,7 @@ oneShotAssign OneShotAssignReq {..} = do
     booking <- (\b -> b {DRB.numberShareConsent = mbRiderConsent}) <$> DInit.buildBooking bArgs searchReq driverQuote searchTry.billingCategory driverQuote.id.getId driverQuote.tripCategory now Nothing Nothing (Just driverQuote.distanceToPickup) Nothing searchReq.configInExperimentVersions driverQuote.coinsRewardedOnGoldTierRide driverQuote.preferenceMatchScore (Just driverQuote.searchTryId) (Just driverQuote.durationToPickup) searchTry.emailDomain searchTry.businessEmailDomain driverQuote.isAutoAccepted searchTry.addOnData
     triggerBookingCreatedEvent BookingEventData {booking = booking, personId = driverQuote.driverId, merchantId = merchant.id}
     QRB.createBooking booking
+    QFP.updatePaymentCharge driverQuote.fareParams booking.fareParams
     -- One-shot bypasses the Beckn confirm handler, whose mkDConfirmResp is the only other
     -- BPP_booking_created_count site, so increment here too or one-shot bookings are uncounted.
     cityLabel <- SML.getCityLabel booking.merchantOperatingCityId
@@ -219,8 +224,10 @@ buildOneShotAssignPayload prefetch booking ride driver vehicle driverQuote = do
         currency = booking.currency,
         estimatedFare = booking.estimatedFare,
         commission = booking.commission,
+        commissionTaxBreakup = booking.estimatedFareSettlement >>= (.commission) >>= (.taxBreakup),
         paymentCharge = booking.paymentCharge,
-        paymentChargeBearer = booking.paymentChargeBearer,
+        paymentChargeTaxBreakup = booking.estimatedFareSettlement >>= (.paymentCharge) >>= (.taxBreakup),
+        paymentChargeDetails = booking.paymentChargeDetails,
         fareBreakups = fareBreakups,
         quoteValidTill = driverQuote.validTill,
         otp = fromMaybe ride.otp ride.endOtp,

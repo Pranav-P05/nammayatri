@@ -3,6 +3,7 @@
 
 module Storage.Beam.DriverQuote where
 
+import qualified Data.Aeson
 import qualified Data.Time
 import qualified Database.Beam as B
 import Domain.Types.Common ()
@@ -41,6 +42,7 @@ data DriverQuoteT f = DriverQuoteT
     estimateId :: B.C f Kernel.Prelude.Text,
     estimatedFare :: B.C f Kernel.Types.Common.Money,
     estimatedFareAmount :: B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney),
+    estimatedFareSettlement :: B.C f (Kernel.Prelude.Maybe Data.Aeson.Value),
     fareParametersId :: B.C f Kernel.Prelude.Text,
     goHomeRequestId :: B.C f (Kernel.Prelude.Maybe Kernel.Prelude.Text),
     id :: B.C f Kernel.Prelude.Text,

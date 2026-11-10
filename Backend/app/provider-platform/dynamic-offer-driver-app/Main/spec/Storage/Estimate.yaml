@@ -10,6 +10,8 @@ imports:
   MerchantOperatingCity: Domain.Types.MerchantOperatingCity
   Centesimal: Kernel.Types.Common
   DriverExtraFeeBounds: Domain.Types.FarePolicy.DriverExtraFeeBounds
+  Value: Data.Aeson
+  FareSettlement: Domain.Types.FareSettlement
 
 Estimate:
     tableName: estimate
@@ -75,6 +77,8 @@ Estimate:
       merchantId: Maybe (Id Merchant)
       merchantOperatingCityId: Maybe (Id MerchantOperatingCity)
       commissionCharges: Maybe HighPrecMoney
+      minFareSettlement: Maybe FareSettlement
+      maxFareSettlement: Maybe FareSettlement
 
     beamFields:
       farePolicy:
@@ -100,6 +104,8 @@ Estimate:
     sqlType:
       farePolicyId: character varying(36)
       tipOptions: integer[]
+      minFareSettlement: "json"
+      maxFareSettlement: "json"
 
     beamType:
       updatedAt: Maybe UTCTime
@@ -107,6 +113,8 @@ Estimate:
       tripCategory: Maybe TripCategory
       distanceUnit: Maybe DistanceUnit
       eligibleForUpgrade: Maybe Bool
+      minFareSettlement: Maybe Value
+      maxFareSettlement: Maybe Value
 
     constraints:
       id: PrimaryKey
@@ -123,6 +131,8 @@ Estimate:
       currency: Kernel.Prelude.fromMaybe Kernel.Types.Common.INR|I
       distanceUnit: Kernel.Prelude.fromMaybe Kernel.Types.Common.Meter|I
       eligibleForUpgrade: Kernel.Prelude.fromMaybe False|I
+      minFareSettlement: Kernel.Utils.JSON.valueToMaybe =<< minFareSettlement|E
+      maxFareSettlement: Kernel.Utils.JSON.valueToMaybe =<< maxFareSettlement|E
 
     toTType:
       updatedAt: Kernel.Prelude.Just|I
@@ -142,6 +152,8 @@ Estimate:
       maxFareAmount: Kernel.Prelude.Just|I
       distanceUnit: Kernel.Prelude.Just|I
       eligibleForUpgrade: Kernel.Prelude.Just|I
+      minFareSettlement: toJSON <$> minFareSettlement|E
+      maxFareSettlement: toJSON <$> maxFareSettlement|E
 
     queries:
       findById:

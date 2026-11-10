@@ -7,6 +7,7 @@ import Data.Aeson
 import qualified Domain.Types.Booking
 import qualified Domain.Types.FareParameters
 import qualified Domain.Types.FarePolicy
+import qualified Domain.Types.FareSettlement
 import qualified Domain.Types.Merchant
 import qualified Domain.Types.MerchantOperatingCity
 import Kernel.Prelude
@@ -26,6 +27,7 @@ data BookingUpdateRequest = BookingUpdateRequest
     estimatedDistance :: Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMeters,
     estimatedDuration :: Kernel.Prelude.Maybe Kernel.Types.Common.Seconds,
     estimatedFare :: Kernel.Types.Common.HighPrecMoney,
+    estimatedFareSettlement :: Kernel.Prelude.Maybe Domain.Types.FareSettlement.FareSettlement,
     estimatedStaticDuration :: Kernel.Prelude.Maybe Kernel.Types.Common.Seconds,
     fareParamsId :: Kernel.Types.Id.Id Domain.Types.FareParameters.FareParameters,
     farePolicyId :: Kernel.Types.Id.Id Domain.Types.FarePolicy.FarePolicy,

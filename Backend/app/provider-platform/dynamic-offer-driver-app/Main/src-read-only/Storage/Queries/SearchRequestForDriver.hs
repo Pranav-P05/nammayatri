@@ -64,6 +64,7 @@ updateByPrimaryKey (Domain.Types.SearchRequestForDriver.SearchRequestForDriver {
       Se.Set Beam.backendConfigVersion (fmap Kernel.Utils.Version.versionToText backendConfigVersion),
       Se.Set Beam.baseFare (Kernel.Prelude.roundToIntegral <$> baseFare),
       Se.Set Beam.baseFareAmount baseFare,
+      Se.Set Beam.baseFareSettlement (toJSON <$> baseFareSettlement),
       Se.Set Beam.batchNumber batchNumber,
       Se.Set Beam.batchingMode batchingMode,
       Se.Set Beam.cancellationRatio cancellationRatio,

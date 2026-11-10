@@ -43,6 +43,7 @@ import qualified Domain.Types.ConditionalCharges as DCC
 import Domain.Types.DriverPoolConfig
 import Domain.Types.EmptyDynamicParam
 import qualified Domain.Types.FarePolicy as DFP
+import qualified Domain.Types.FareSettlement as DFS
 import qualified Domain.Types.FleetConfig as DFC
 import Domain.Types.GoHomeConfig (GoHomeConfig)
 import qualified Domain.Types.Location as DLoc
@@ -292,7 +293,7 @@ sendSearchRequestToDrivers dispatchMode isAllocatorBatch isTopUpDispatch tripQuo
     let holdOwnerId = fromMaybe dPoolRes.driverPoolResult.driverId.getId dPoolRes.driverPoolResult.fleetOwnerId
     addOfferHoldsForSearchTry transporterConfig isPrepaidEnabled holdOwnerId searchTry.id.getId searchTry.paymentInstrument searchTry.baseFare tripQuoteDetail.govtCharges tripQuoteDetail.tollCharges tripQuoteDetail.driverParkingCharge tripQuoteDetail.bufferedFare validTill
     let safetyCharges = maybe 0 DCC.charge $ find (\ac -> DCC.SAFETY_PLUS_CHARGES == ac.chargeCategory) tripQuoteDetail.conditionalCharges
-    let entityData = USRD.makeSearchRequestForDriverAPIEntity sReqFD translatedSearchReq searchTry bapMetadata dPoolRes.intelligentScores.rideRequestPopupDelayDuration dPoolRes.specialZoneExtraTip dPoolRes.keepHiddenForSeconds tripQuoteDetail.vehicleServiceTier needTranslation isValueAddNP useSilentFCMForForwardBatch tripQuoteDetail.driverPickUpCharge tripQuoteDetail.driverParkingCharge safetyCharges tripQuoteDetail.congestionCharges tripQuoteDetail.petCharges tripQuoteDetail.priorityCharges tripQuoteDetail.tollCharges (Just transporterConfig.driverWalletConfig) mbRiderDetails transporterConfig.showRoutePerRequest
+    let entityData = USRD.makeSearchRequestForDriverAPIEntity sReqFD translatedSearchReq searchTry bapMetadata dPoolRes.intelligentScores.rideRequestPopupDelayDuration dPoolRes.specialZoneExtraTip dPoolRes.keepHiddenForSeconds tripQuoteDetail.vehicleServiceTier needTranslation isValueAddNP useSilentFCMForForwardBatch tripQuoteDetail.driverPickUpCharge tripQuoteDetail.driverParkingCharge safetyCharges tripQuoteDetail.congestionCharges tripQuoteDetail.petCharges tripQuoteDetail.priorityCharges tripQuoteDetail.tollCharges tripQuoteDetail.commissionChargeConfig tripQuoteDetail.rideTax tripQuoteDetail.airportEntryFee mbRiderDetails transporterConfig.showRoutePerRequest
     -- Notify.notifyOnNewSearchRequestAvailable searchReq.merchantOperatingCityId sReqFD.driverId dPoolRes.driverPoolResult.driverDeviceToken entityData
     notificationData <- Notify.buildSendSearchRequestNotificationData searchTry.merchantOperatingCityId sReqFD.driverId dPoolRes.driverPoolResult.driverDeviceToken entityData EmptyDynamicParam (Just searchTry.tripCategory)
     let otherMerchantIds = [Just (Id "840327a8-f17c-4d7c-8199-a583cfaadc5f"), Just (Id "7e6a2982-f8b5-4c67-b8af-bf41f1b4a2c9"), Just (Id "8c91f173-a0e3-4c5b-b3a1-2a58d00f29b2")] :: [Maybe (Id DM.Merchant)] -- Array Contents are : [Dev/Master , UAT , Prod]
@@ -352,6 +353,18 @@ fetchDynamicPickupMetrics driverPoolConfig searchReq pool =
           logWarning $ "Display pickup distance/duration fetch failed for searchReq " <> searchReq.id.getId <> ", falling back to the pooling provider's values: " <> show err
           pure M.empty
 
+quoteFareChargeRates :: DSR.SearchRequest -> DST.SearchTry -> SDP.TripQuoteDetail -> Fare.FareChargeRates
+quoteFareChargeRates searchReq searchTry tripQuoteDetail =
+  Fare.FareChargeRates
+    { currency = searchTry.currency,
+      commissionChargeConfig = tripQuoteDetail.commissionChargeConfig,
+      rideTax = tripQuoteDetail.rideTax,
+      paymentChargeDetails = searchTry.paymentChargeDetails,
+      discountAmount = searchTry.discountAmount,
+      cancellationDuesCommission = Fare.searchCancellationDuesCommission searchReq,
+      deductedAtPayment = Nothing
+    }
+
 getBaseFare ::
   ( MonadFlow m,
     Redis.HedisFlow m r,
@@ -366,7 +379,7 @@ getBaseFare ::
   Maybe Months ->
   SDP.TripQuoteDetail ->
   DTR.TransporterConfig ->
-  m HighPrecMoney
+  m (HighPrecMoney, DFS.FareSettlement)
 getBaseFare searchTry searchReq farePolicy vehicleAge tripQuoteDetail transporterConfig = do
   mbDomainDiscountPct <- CQDDC.resolveDomainDiscountPercentage searchReq.merchantOperatingCityId searchTry.emailDomain searchTry.businessEmailDomain searchTry.billingCategory farePolicy.vehicleServiceTier
   let farePolicy' =
@@ -383,6 +396,8 @@ getBaseFare searchTry searchReq farePolicy vehicleAge tripQuoteDetail transporte
           computationPhase = Fare.FCEstimate,
           mbCapConfig = Nothing,
           mbEstimateFareParams = Nothing,
+          paymentChargeDetails = searchTry.paymentChargeDetails,
+          buyerOfferDiscount = searchTry.discountAmount,
           actualDistance = searchReq.estimatedDistance,
           estimatedDistance = searchReq.estimatedDistance,
           rideTime = searchReq.startTime,
@@ -406,6 +421,7 @@ getBaseFare searchTry searchReq farePolicy vehicleAge tripQuoteDetail transporte
           negativeFareAdjustment = Nothing,
           nightShiftCharge = Nothing,
           customerCancellationDues = searchReq.customerCancellationDues,
+          customerCancellationDuesTaxBreakup = searchReq.customerCancellationDuesTaxBreakup,
           nightShiftOverlapChecking = DTC.isFixedNightCharge tripQuoteDetail.tripCategory,
           timeDiffFromUtc = Just transporterConfig.timeDiffFromUtc,
           tollCharges = Nothing,
@@ -413,15 +429,14 @@ getBaseFare searchTry searchReq farePolicy vehicleAge tripQuoteDetail transporte
           vehicleAge = vehicleAge,
           currency = searchReq.currency,
           distanceUnit = searchReq.distanceUnit,
-          merchantOperatingCityId = Just searchReq.merchantOperatingCityId,
+          merchantOperatingCityId = searchReq.merchantOperatingCityId,
           mbAdditonalChargeCategories = Nothing,
           numberOfLuggages = searchReq.numberOfLuggages,
-          govtChargesRate = Just transporterConfig.taxConfig.rideGst,
           pickupGateId = searchReq.pickupGateId,
           fareSettlementType = farePolicy'.fareSettlementType,
           isParkingFeeExempt = False
         }
-  pure $ Fare.fareSum fareParams $ Just []
+  pure $ Fare.fareSum ((Fare.fareChargeRates transporterConfig (Just farePolicy') searchTry.paymentChargeDetails searchTry.discountAmount searchTry.currency) {Fare.cancellationDuesCommission = Fare.searchCancellationDuesCommission searchReq}) fareParams $ Just []
 
 -- | Extracted from sendSearchRequestToDrivers' where-clause so DriverPoolUnified's priority-assign path can reuse it too.
 buildSearchRequestForDriver ::
@@ -467,11 +482,11 @@ buildSearchRequestForDriver searchTry searchReq tripQuoteDetailsHashMap batchNum
 
   logInfo $ "Coins rewarded on gold tier ride request: " <> show driverCoinsRewardedOnGoldTierRideRequest
 
-  baseFare <- case tripQuoteDetail.tripCategory of
+  (baseFare, baseFareSettlement) <- case tripQuoteDetail.tripCategory of
     DTC.Ambulance _ -> do
       farePolicy <- getFarePolicyByEstOrQuoteId Nothing (Just $ EMaps.getCoordinates searchReq.fromLocation) (Just . EMaps.getCoordinates =<< searchReq.toLocation) searchReq.fromLocGeohash searchReq.toLocGeohash searchReq.estimatedDistance searchReq.estimatedDuration searchReq.merchantOperatingCityId tripQuoteDetail.tripCategory dpRes.serviceTier searchReq.area searchTry.estimateId Nothing Nothing searchReq.dynamicPricingLogicVersion (Just (TransactionId (Id searchReq.transactionId))) searchReq.configInExperimentVersions searchReq.specialLocationName
-      getBaseFare searchTry searchReq farePolicy dpRes.vehicleAge tripQuoteDetail transporterConfig
-    _ -> pure $ tripQuoteDetail.baseFare + additionalCharges
+      fmap Just <$> getBaseFare searchTry searchReq farePolicy dpRes.vehicleAge tripQuoteDetail transporterConfig
+    _ -> pure (tripQuoteDetail.baseFare + additionalCharges, snd . (\fp -> Fare.fareSum (quoteFareChargeRates searchReq searchTry tripQuoteDetail) fp (Just additionalChargesEligiblFor)) <$> tripQuoteDetail.fareParams)
   deploymentVersion <- asks (.version)
   isFavourite <- maybe (pure Nothing) (\riderid -> findByRiderIdAndDriverId riderid (cast dpRes.driverId) <&> fmap (.favourite)) riderId
   let fleetForbidsCancellation = fleetForbidsDriverCancellation (dpRes.fleetOwnerId >>= (`M.lookup` fleetConfigs))
@@ -520,6 +535,7 @@ buildSearchRequestForDriver searchTry searchReq tripQuoteDetailsHashMap batchNum
             driverDefaultStepFee = tripQuoteDetail.driverDefaultStepFee,
             rideRequestPopupDelayDuration = dpwRes.intelligentScores.rideRequestPopupDelayDuration,
             baseFare = Just baseFare,
+            baseFareSettlement = baseFareSettlement,
             currency,
             distanceUnit = searchReq.distanceUnit,
             isPartOfIntelligentPool = dpwRes.isPartOfIntelligentPool,
@@ -562,7 +578,7 @@ buildSearchRequestForDriver searchTry searchReq tripQuoteDetailsHashMap batchNum
             conditionalCharges = additionalChargesEligiblFor,
             isSafetyPlus = Just isEligibleForSafetyPlusCharge,
             coinsRewardedOnGoldTierRide = driverCoinsRewardedOnGoldTierRideRequest,
-            commissionCharges = tripQuoteDetail.commissionCharges,
+            commissionCharges = (Fare.settlementCommissionTotal <$> baseFareSettlement) <|> tripQuoteDetail.commissionCharges,
             driverCancellationNotAllowed = if fleetForbidsCancellation then Just True else tripQuoteDetail.driverCancellationNotAllowed,
             isAutoAccepted = Just isAutoAccepted,
             hasAvailableForRidesTag = Just $ AvailableForRides.hasAvailableForRidesTag dpRes.driverTags,
