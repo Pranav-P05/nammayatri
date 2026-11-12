@@ -34,6 +34,7 @@ import qualified Domain.Types.TransporterConfig as DTConf
 import qualified Domain.Types.VehicleVariant as DV
 import Kernel.External.Maps.Google.PolyLinePoints
 import Kernel.Prelude
+import qualified Kernel.Storage.Hedis as Redis
 import Kernel.Types.Common
 import Kernel.Types.Id
 import Kernel.Types.Price ()
@@ -233,6 +234,14 @@ makeSearchRequestForDriverAPIEntity nearbyReq searchRequest searchTry bapMetadat
     minNonZero a b = min a b
     deriveIsPaymentOnline :: Maybe DMPM.PaymentInstrument -> Maybe Bool
     deriveIsPaymentOnline = fmap (\case DMPM.Cash -> False; _ -> True)
+
+-- Keyed per SearchRequestForDriver row: one driver can hold several rows for the same search try
+-- (one per service tier, or across batches), and each must return its own card.
+mkSentEntityKey :: Id SearchRequestForDriver -> Text
+mkSentEntityKey sReqFDId = "SRFD:SentEntity:" <> sReqFDId.getId
+
+getSentEntity :: Redis.HedisFlow m r => SearchRequestForDriver -> m (Maybe SearchRequestForDriverAPIEntity)
+getSentEntity sReqFD = Redis.withCrossAppRedis $ Redis.safeGet (mkSentEntityKey sReqFD.id)
 
 extractDriverPickupCharges :: DFP.FarePolicyDetailsD s -> Maybe HighPrecMoney
 extractDriverPickupCharges farePolicyDetails =
