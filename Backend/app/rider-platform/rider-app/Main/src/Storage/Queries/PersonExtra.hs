@@ -581,14 +581,19 @@ updateTotalRidesCount personId totalRidesCount = do
       ]
       [Se.Is BeamP.id (Se.Eq (getId personId))]
 
-updateTotalValidRidesCount :: (EsqDBFlow m r, MonadFlow m, CacheFlow m r) => Id Person -> Int -> m ()
-updateTotalValidRidesCount personId totalValidRidesCount = do
+-- one write for both ride counters; a Nothing count is left unchanged
+updateTotalRidesCounts :: (EsqDBFlow m r, MonadFlow m, CacheFlow m r) => Id Person -> Maybe Int -> Maybe Int -> m ()
+updateTotalRidesCounts personId mbTotalRidesCount mbTotalValidRidesCount = do
   now <- getCurrentTime
-  updateOneWithKV
-    [ Se.Set BeamP.totalValidRidesCount (Just totalValidRidesCount),
-      Se.Set BeamP.updatedAt now
-    ]
-    [Se.Is BeamP.id (Se.Eq (getId personId))]
+  let counts =
+        catMaybes
+          [ Se.Set BeamP.totalRidesCount . Just <$> mbTotalRidesCount,
+            Se.Set BeamP.totalValidRidesCount . Just <$> mbTotalValidRidesCount
+          ]
+  unless (null counts) $
+    updateOneWithKV
+      (counts <> [Se.Set BeamP.updatedAt now])
+      [Se.Is BeamP.id (Se.Eq (getId personId))]
 
 updatePersonComments :: (EsqDBFlow m r, MonadFlow m, CacheFlow m r) => Id Person -> Maybe [Text] -> m ()
 updatePersonComments personId comments = do
