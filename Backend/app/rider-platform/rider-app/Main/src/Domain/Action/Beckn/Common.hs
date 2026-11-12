@@ -1051,6 +1051,9 @@ rideCompletedReqHandler ValidatedRideCompletedReq {..} = do
       Just location -> frequencyUpdator booking.merchantId location Nothing TripEnd Nothing
       Nothing -> return ()
   fork "updating total rides count" $ SMC.updateTotalRidesCounters person
+  -- counts only rides the BPP marked valid; a missing flag (non value-add NP) is not counted
+  when (isValidRide == Just True) $
+    fork "updating total valid rides count" $ QP.updateTotalValidRidesCount person.id (fromMaybe 0 person.totalValidRidesCount + 1)
   merchantConfigs <- getConfig (MerchantConfigDimensions {merchantOperatingCityId = booking.merchantOperatingCityId.getId}) Nothing
   SMC.updateTotalRidesInWindowCounters booking.riderId merchantConfigs
   mbDriverPhoneNumber <- mapM decrypt ride.driverPhoneNumber

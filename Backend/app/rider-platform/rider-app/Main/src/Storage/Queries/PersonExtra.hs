@@ -581,6 +581,15 @@ updateTotalRidesCount personId totalRidesCount = do
       ]
       [Se.Is BeamP.id (Se.Eq (getId personId))]
 
+updateTotalValidRidesCount :: (EsqDBFlow m r, MonadFlow m, CacheFlow m r) => Id Person -> Int -> m ()
+updateTotalValidRidesCount personId totalValidRidesCount = do
+  now <- getCurrentTime
+  updateOneWithKV
+    [ Se.Set BeamP.totalValidRidesCount (Just totalValidRidesCount),
+      Se.Set BeamP.updatedAt now
+    ]
+    [Se.Is BeamP.id (Se.Eq (getId personId))]
+
 updatePersonComments :: (EsqDBFlow m r, MonadFlow m, CacheFlow m r) => Id Person -> Maybe [Text] -> m ()
 updatePersonComments personId comments = do
   whenJust comments \comments' -> do
