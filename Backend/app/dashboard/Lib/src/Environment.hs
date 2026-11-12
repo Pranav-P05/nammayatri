@@ -22,7 +22,7 @@ import Domain.Types.ServerName
 import Kernel.External.Encryption (EncTools)
 import Kernel.Prelude
 import Kernel.Storage.Esqueleto.Config
-import Kernel.Storage.Hedis (HedisCfg, HedisEnv, connectHedis, connectHedisCluster, disconnectHedis)
+import Kernel.Storage.Hedis (HedisCfg, HedisEnv, HedisPeerCfg, connectHedis, connectHedisCluster, connectSecondaryAndPeerHedisClusters, disconnectHedis)
 import qualified Kernel.Storage.InMem as IM
 import qualified Kernel.Tools.Metrics.CoreMetrics as Metrics
 import Kernel.Tools.Slack.Internal
@@ -47,6 +47,7 @@ data AppCfg = AppCfg
     hedisCfg :: HedisCfg,
     hedisClusterCfg :: HedisCfg,
     hedisSecondaryClusterCfg :: HedisCfg,
+    hedisPeerClusterCfgs :: [HedisPeerCfg],
     hedisNonCriticalCfg :: HedisCfg,
     hedisNonCriticalClusterCfg :: HedisCfg,
     hedisMigrationStage :: Bool,
@@ -106,6 +107,7 @@ data AppEnv = AppEnv
     hedisNonCriticalClusterEnv :: HedisEnv,
     hedisClusterEnv :: HedisEnv,
     secondaryHedisClusterEnv :: Maybe HedisEnv,
+    additionalHedisClusterEnvs :: [HedisEnv],
     hedisMigrationStage :: Bool,
     cutOffHedisCluster :: Bool,
     port :: Int,
@@ -186,12 +188,7 @@ buildAppEnv authTokenCacheKeyPrefix AppCfg {..} = do
     if cutOffHedisCluster
       then pure hedisNonCriticalEnv
       else connectHedisCluster hedisNonCriticalClusterCfg modifierFunc
-  secondaryHedisClusterEnv <-
-    Kernel.Prelude.try (connectHedisCluster hedisSecondaryClusterCfg modifierFunc) >>= \case
-      Left (e :: SomeException) -> do
-        putStrLn $ "ERROR: Failed to connect to secondary hedis cluster: " ++ show e
-        pure Nothing
-      Right env -> pure (Just env)
+  (secondaryHedisClusterEnv, additionalHedisClusterEnvs) <- connectSecondaryAndPeerHedisClusters hedisSecondaryClusterCfg hedisPeerClusterCfgs modifierFunc
   isShuttingDown <- mkShutdown
   let internalEndPointHashMap = HM.fromList $ M.toList internalEndPointMap
   cacAclMapRaw <- fromMaybe (error "AUTH_MAP not found in Env !!!!") <$> lookupEnv "AUTH_MAP"
@@ -220,6 +217,7 @@ releaseAppEnv AppEnv {..} = do
   disconnectHedis hedisEnv
   disconnectHedis hedisClusterEnv
   maybe (pure ()) disconnectHedis secondaryHedisClusterEnv
+  mapM_ disconnectHedis additionalHedisClusterEnvs
 
 type FlowHandler = FlowHandlerR AppEnv
 

@@ -116,5 +116,6 @@ in  { hedisCfg
     , cacConfig
     , inMemConfig
     , hedisSecondaryClusterCfg
+    , hedisPeerClusterCfgs = common.noHedisPeerClusterCfgs
     , blackListedJobs = [] : List Text
     }

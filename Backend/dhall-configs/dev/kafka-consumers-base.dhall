@@ -133,6 +133,7 @@ let inMemConfig = { enableInMem = False, maxInMemSize = +100000000 }
 in  { hedisCfg
     , hedisClusterCfg
     , hedisSecondaryClusterCfg
+    , hedisPeerClusterCfgs = common.noHedisPeerClusterCfgs
     , hedisNonCriticalCfg = hedisCfg
     , hedisNonCriticalClusterCfg = hedisClusterCfg
     , ltsRedisCfg = hedisCfg

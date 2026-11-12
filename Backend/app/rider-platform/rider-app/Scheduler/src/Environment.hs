@@ -35,7 +35,7 @@ import Kernel.Prelude
 import Kernel.Sms.Config (SmsConfig)
 import Kernel.Storage.Clickhouse.Config
 import Kernel.Storage.Esqueleto.Config
-import Kernel.Storage.Hedis (HedisEnv, connectHedis, connectHedisCluster, disconnectHedis)
+import Kernel.Storage.Hedis (HedisEnv, connectHedis, connectHedisCluster, connectSecondaryAndPeerHedisClusters, disconnectHedis)
 import Kernel.Storage.InMem as IM
 import Kernel.Streaming.Kafka.Producer.Types
 import Kernel.Types.Base64 (Base64)
@@ -85,6 +85,7 @@ data HandlerEnv = HandlerEnv
     hedisNonCriticalClusterEnv :: HedisEnv,
     hedisClusterEnv :: HedisEnv,
     secondaryHedisClusterEnv :: Maybe HedisEnv,
+    additionalHedisClusterEnvs :: [HedisEnv],
     ltsHedisEnv :: HedisEnv,
     secondaryLTSHedisEnv :: Maybe HedisEnv,
     ltsReplicaHedisEnv :: Maybe HedisEnv,
@@ -179,12 +180,7 @@ buildHandlerEnv HandlerCfg {..} = do
     if cutOffHedisCluster
       then pure hedisNonCriticalEnv
       else connectHedisCluster hedisNonCriticalClusterCfg ("doa:n_c:" <>)
-  secondaryHedisClusterEnv <-
-    Kernel.Prelude.try (connectHedisCluster schedulerConfig.hedisSecondaryClusterCfg ("rider-app-scheduler:" <>)) >>= \case
-      Left (e :: SomeException) -> do
-        putStrLn $ "ERROR: Failed to connect to secondary hedis cluster: " ++ show e
-        pure Nothing
-      Right env -> pure (Just env)
+  (secondaryHedisClusterEnv, additionalHedisClusterEnvs) <- connectSecondaryAndPeerHedisClusters schedulerConfig.hedisSecondaryClusterCfg schedulerConfig.hedisPeerClusterCfgs ("rider-app-scheduler:" <>)
   let jobInfoMap :: (M.Map Text Bool) = M.mapKeys show jobInfoMapx
   let jobRetryOnExceptionMap :: (M.Map Text Bool) = M.mapKeys show jobRetryOnExceptionMapx
   let internalEndPointHashMap = HM.fromList $ M.toList internalEndPointMap
@@ -222,6 +218,7 @@ releaseHandlerEnv HandlerEnv {..} = do
   disconnectHedis hedisEnv
   disconnectHedis hedisClusterEnv
   maybe (pure ()) disconnectHedis secondaryHedisClusterEnv
+  mapM_ disconnectHedis additionalHedisClusterEnvs
   disconnectHedis ltsHedisEnv
   maybe (pure ()) disconnectHedis secondaryLTSHedisEnv
   maybe (pure ()) disconnectHedis ltsReplicaHedisEnv

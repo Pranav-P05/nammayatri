@@ -231,6 +231,7 @@ allConnectionsHealthCheck = do
         [ ("clusterRedis", Just env.hedisClusterEnv),
           ("secondaryClusterRedis", env.secondaryHedisClusterEnv)
         ]
+          <> zipWith (\i hedisEnv -> ("peerClusterRedis" <> show (i :: Int), Just hedisEnv)) [1 ..] env.additionalHedisClusterEnvs
       dbEnvs = [("db", env.esqDBEnv), ("replicaDb", env.esqDBReplicaEnv)]
   dbErrors <- liftIO $ catMaybes <$> forM dbEnvs (\(name, dbEnv) -> runCheck name (checkDb dbEnv))
   redisErrors <- liftIO $ catMaybes <$> forM redisEnvs (\(name, mbHedisEnv) -> maybe (pure Nothing) (runCheck name . checkRedis) mbHedisEnv)

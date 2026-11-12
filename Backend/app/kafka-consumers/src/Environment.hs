@@ -112,6 +112,7 @@ data AppCfg = AppCfg
     ltsReplicaRedisCfg :: Maybe HedisCfg,
     hedisClusterCfg :: HedisCfg,
     hedisSecondaryClusterCfg :: HedisCfg,
+    hedisPeerClusterCfgs :: [HedisPeerCfg],
     hedisNonCriticalCfg :: HedisCfg,
     hedisNonCriticalClusterCfg :: HedisCfg,
     hedisMigrationStage :: Bool,
@@ -165,6 +166,7 @@ data AppEnv = AppEnv
     hedisNonCriticalClusterEnv :: HedisEnv,
     hedisClusterEnv :: HedisEnv,
     secondaryHedisClusterEnv :: Maybe HedisEnv,
+    additionalHedisClusterEnvs :: [HedisEnv],
     cutOffHedisCluster :: Bool,
     hedisMigrationStage :: Bool,
     kafkaConsumerCfg :: ConsumerConfig,
@@ -271,12 +273,7 @@ buildAppEnv AppCfg {..} consumerType = do
     if cutOffHedisCluster
       then pure hedisNonCriticalEnv
       else connectHedisCluster hedisNonCriticalClusterCfg id
-  secondaryHedisClusterEnv <-
-    Kernel.try (connectHedisCluster hedisSecondaryClusterCfg id) >>= \case
-      Left (e :: SomeException) -> do
-        putStrLn $ "ERROR: Failed to connect to secondary hedis cluster: " ++ Kernel.Prelude.show e
-        pure Nothing
-      Right env -> pure (Just env)
+  (secondaryHedisClusterEnv, additionalHedisClusterEnvs) <- connectSecondaryAndPeerHedisClusters hedisSecondaryClusterCfg hedisPeerClusterCfgs id
   loggerEnv <- prepareLoggerEnv loggerConfig hostname
   coreMetrics <- Metrics.registerCoreMetricsContainer
   eventRequestCounter <- registerEventRequestCounterMetric
@@ -302,3 +299,4 @@ releaseAppEnv AppEnv {..} = do
   Kernel.Prelude.maybe (pure ()) disconnectHedis secondaryLTSHedisEnv
   Kernel.Prelude.maybe (pure ()) disconnectHedis ltsReplicaHedisEnv
   Kernel.Prelude.maybe (pure ()) disconnectHedis secondaryHedisClusterEnv
+  mapM_ disconnectHedis additionalHedisClusterEnvs

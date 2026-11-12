@@ -58,6 +58,32 @@ Core KV functions are in:
 | `deleteWithKV` | Delete record |
 | `createWithKV` | Create record (DB + Redis) |
 
+## N-Cloud Redis (AWS / GCP / NAMMA)
+
+Redis is no longer limited to a primary and one secondary. Every cloud other than the local one is a peer.
+
+| Piece | Where |
+|-------|-------|
+| `CloudType` (`AWS`, `GCP`, `NAMMA`, `UNAVAILABLE`) and codes 0/1/2 | `Kernel.Types.Version` (`cloudTypeCode`) |
+| Cloud tag on ids | `Kernel.Types.CloudTag` (`tagLocalGuid`), `EulerHS.KVConnector.CloudTag` |
+| Peer config | `hedisPeerClusterCfgs :: [HedisPeerCfg]` in the app config, `additionalHedisClusterEnvs` in the env |
+| KV probing | `EulerHS.KVConnector.Flow` / `Utils` (`meshPeerConns`, `findOneFromRedisAcrossClouds`) |
+
+### Cloud-tagged ids
+`generateGUID` (FlowR) replaces the last two characters of the UUID with two decimal digits `v = 10*spread + cloudCode`, using `CLOUD_TYPE` of the generating pod. The cloud is read back as `v % 10`, so adding a cloud never changes how existing ids decode. Ids that are not UUIDs, or have no tag, simply have no hint.
+
+### Read and write behaviour
+1. `findOne`: the cloud named by the tag on the row's own primary key is probed first; on a miss every other cloud is probed in parallel. Without a tag the local cloud goes first.
+2. `findAll` / `findAllWithOptions` / update-all / delete-all: all clouds are read in parallel (plus DB where applicable) and merged by primary key.
+3. Updates and deletes are applied in the cloud where the row was found. Creates go to the local cloud.
+4. The tag is only a hint. A wrong or missing tag falls back to the parallel search, so correctness never depends on it.
+
+### Config
+- `hedisPeerClusterCfgs = []` keeps the old behaviour (`hedisSecondaryClusterCfg` is the single peer; AWS and GCP are mapped to each other from `CLOUD_TYPE`).
+- A non-empty list replaces the secondary. The first entry is the legacy `KVRedisSecondary` connection, the rest connect as `KVRedis<Cloud>`.
+- Each entry is `{ peerCloud, peerHedisCfg }`. See `dhall-configs/generic/common.dhall` (`HedisPeerCfg`, `noHedisPeerClusterCfgs`).
+- `runInMasterCloudRedisCell` and the LTS redis helpers still use the legacy secondary only.
+
 ## Multi-Cloud Callback Routing
 
 For FRFS (public transport), `mkCloudBapUri` in `Beckn/ACL/FRFS/Utils.hs` replaces the host of `subscriberUrl` with runtime `nwAddress` for correct multi-cloud callback routing.

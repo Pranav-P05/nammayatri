@@ -27,7 +27,7 @@ import qualified Kernel.Beam.Types as KBT
 import Kernel.Prelude
 import Kernel.Storage.Beam.SystemConfigs
 import Kernel.Storage.Esqueleto.Config
-import Kernel.Storage.Hedis (HedisCfg, HedisEnv, HedisFlow, disconnectHedis)
+import Kernel.Storage.Hedis (HedisCfg, HedisEnv, HedisFlow, HedisPeerCfg, disconnectHedis)
 import Kernel.Storage.Queries.SystemConfigs as QSC
 import Kernel.Streaming.Kafka.Producer.Types
 import Kernel.Tools.Metrics.CoreMetrics as Metrics
@@ -52,6 +52,7 @@ data SchedulerConfig = SchedulerConfig
     hedisCfg :: HedisCfg,
     hedisClusterCfg :: HedisCfg,
     hedisSecondaryClusterCfg :: HedisCfg,
+    hedisPeerClusterCfgs :: [HedisPeerCfg],
     hedisNonCriticalCfg :: HedisCfg,
     hedisNonCriticalClusterCfg :: HedisCfg,
     hedisMigrationStage :: Bool,
@@ -99,6 +100,7 @@ data SchedulerEnv = SchedulerEnv
     hedisNonCriticalClusterEnv :: HedisEnv,
     hedisClusterEnv :: HedisEnv,
     secondaryHedisClusterEnv :: Maybe HedisEnv,
+    additionalHedisClusterEnvs :: [HedisEnv],
     hedisMigrationStage :: Bool,
     cutOffHedisCluster :: Bool,
     coreMetrics :: Metrics.CoreMetricsContainer,
@@ -157,6 +159,7 @@ releaseSchedulerEnv SchedulerEnv {..} = do
   disconnectHedis hedisEnv
   disconnectHedis hedisClusterEnv
   maybe (pure ()) disconnectHedis secondaryHedisClusterEnv
+  mapM_ disconnectHedis additionalHedisClusterEnvs
 
 type SchedulerM = FlowR SchedulerEnv
 
@@ -186,7 +189,8 @@ runSchedulerM schedulerConfig env action = do
               { esqDBCfg = schedulerConfig.esqDBCfg,
                 esqDBReplicaCfg = schedulerConfig.esqDBReplicaCfg,
                 hedisClusterCfg = schedulerConfig.hedisClusterCfg,
-                hedisSecondaryClusterCfg = schedulerConfig.hedisSecondaryClusterCfg
+                hedisSecondaryClusterCfg = schedulerConfig.hedisSecondaryClusterCfg,
+                hedisPeerClusterCfgs = schedulerConfig.hedisPeerClusterCfgs
               }
             env.kvConfigUpdateFrequency
         )

@@ -112,6 +112,7 @@ data AppCfg = AppCfg
     hedisCfg :: HedisCfg,
     hedisClusterCfg :: HedisCfg,
     hedisSecondaryClusterCfg :: HedisCfg,
+    hedisPeerClusterCfgs :: [HedisPeerCfg],
     ltsRedis :: HedisCfg,
     ltsSecondaryRedis :: HedisCfg,
     ltsReplicaRedis :: Maybe HedisCfg,
@@ -345,6 +346,7 @@ data AppEnv = AppEnv
     hedisNonCriticalClusterEnv :: HedisEnv,
     hedisClusterEnv :: HedisEnv,
     secondaryHedisClusterEnv :: Maybe HedisEnv,
+    additionalHedisClusterEnvs :: [HedisEnv],
     cutOffHedisCluster :: Bool,
     cutOffNonCriticalHedisCluster :: Bool,
     hedisMigrationStage :: Bool,
@@ -481,12 +483,7 @@ buildAppEnv cfg@AppCfg {..} = do
     if cutOffNonCriticalHedisCluster
       then pure hedisNonCriticalEnv
       else connectHedisCluster hedisNonCriticalClusterCfg nonCriticalModifierFunc
-  secondaryHedisClusterEnv <-
-    Kernel.Prelude.try (connectHedisCluster hedisSecondaryClusterCfg riderAppPrefix) >>= \case
-      Left (e :: SomeException) -> do
-        putStrLn $ "ERROR: Failed to connect to secondary hedis cluster: " ++ show e
-        pure Nothing
-      Right env -> pure (Just env)
+  (secondaryHedisClusterEnv, additionalHedisClusterEnvs) <- connectSecondaryAndPeerHedisClusters hedisSecondaryClusterCfg hedisPeerClusterCfgs riderAppPrefix
   s3Env <- buildStorageEnvIO loggerEnv cfg.storageServiceConfig
   s3EnvPublic <- buildStorageEnvIO loggerEnv cfg.storagePublicServiceConfig
   let s3RewardsEnv = buildS3Env cfg.s3RewardsConfig
@@ -539,6 +536,7 @@ releaseAppEnv AppEnv {..} = do
   disconnectHedis hedisEnv
   disconnectHedis hedisClusterEnv
   maybe (pure ()) disconnectHedis secondaryHedisClusterEnv
+  mapM_ disconnectHedis additionalHedisClusterEnvs
   disconnectHedis ltsHedisEnv
   maybe (pure ()) disconnectHedis secondaryLTSHedisEnv
   maybe (pure ()) disconnectHedis ltsReplicaHedisEnv

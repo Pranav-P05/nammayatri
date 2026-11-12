@@ -105,6 +105,7 @@ data AppCfg = AppCfg
     hedisCfg :: HedisCfg,
     hedisClusterCfg :: HedisCfg,
     hedisSecondaryClusterCfg :: HedisCfg,
+    hedisPeerClusterCfgs :: [HedisPeerCfg],
     ltsRedisCfg :: HedisCfg,
     secondaryLTSRedisCfg :: Maybe HedisCfg,
     ltsReplicaRedisCfg :: Maybe HedisCfg,
@@ -281,6 +282,7 @@ data AppEnv = AppEnv
     hedisNonCriticalClusterEnv :: HedisEnv,
     hedisClusterEnv :: HedisEnv,
     secondaryHedisClusterEnv :: Maybe HedisEnv,
+    additionalHedisClusterEnvs :: [HedisEnv],
     isShuttingDown :: TMVar (),
     loggerEnv :: LoggerEnv,
     encTools :: EncTools,
@@ -481,12 +483,7 @@ buildAppEnv cfg@AppCfg {searchRequestExpirationSeconds = _searchRequestExpiratio
     if cutOffHedisCluster
       then pure hedisNonCriticalEnv
       else connectHedisCluster hedisNonCriticalClusterCfg modifierFunc
-  secondaryHedisClusterEnv <-
-    try (connectHedisCluster hedisSecondaryClusterCfg modifierFunc) >>= \case
-      Left (e :: SomeException) -> do
-        putStrLn $ "ERROR: Failed to connect to secondary hedis cluster: " ++ show e
-        pure Nothing
-      Right env -> pure (Just env)
+  (secondaryHedisClusterEnv, additionalHedisClusterEnvs) <- connectSecondaryAndPeerHedisClusters hedisSecondaryClusterCfg hedisPeerClusterCfgs modifierFunc
   let requestId = Nothing
   shouldLogRequestId <- fromMaybe False . (>>= readMaybe) <$> lookupEnv "SHOULD_LOG_REQUEST_ID"
   enableDriverFeeShardedFanOut <- fromMaybe False . (>>= readMaybe) <$> lookupEnv "ENABLE_DRIVER_FEE_SHARDED_FAN_OUT"
@@ -544,6 +541,7 @@ releaseAppEnv AppEnv {..} = do
   maybe (pure ()) disconnectHedis ltsReplicaHedisEnv
   disconnectHedis hedisClusterEnv
   maybe (pure ()) disconnectHedis secondaryHedisClusterEnv
+  mapM_ disconnectHedis additionalHedisClusterEnvs
 
 type Env = EnvR AppEnv
 

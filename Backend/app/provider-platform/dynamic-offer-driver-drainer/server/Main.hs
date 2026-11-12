@@ -54,7 +54,8 @@ main = do
                   { esqDBCfg = appCfg.esqDBCfg,
                     esqDBReplicaCfg = appCfg.esqDBReplicaCfg,
                     hedisClusterCfg = appCfg.hedisClusterCfg,
-                    hedisSecondaryClusterCfg = appCfg.hedisClusterCfg
+                    hedisSecondaryClusterCfg = appCfg.hedisClusterCfg,
+                    hedisPeerClusterCfgs = []
                   }
                 appCfg.kvConfigUpdateFrequency
             )

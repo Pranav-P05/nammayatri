@@ -24,6 +24,7 @@ let schedulerConfig =
       , hedisCfg = appCfg.hedisCfg
       , hedisClusterCfg = appCfg.hedisClusterCfg
       , hedisSecondaryClusterCfg = appCfg.hedisSecondaryClusterCfg
+      , hedisPeerClusterCfgs = appCfg.hedisPeerClusterCfgs
       , hedisNonCriticalCfg = appCfg.hedisCfg
       , hedisNonCriticalClusterCfg = appCfg.hedisClusterCfg
       , hedisMigrationStage = False

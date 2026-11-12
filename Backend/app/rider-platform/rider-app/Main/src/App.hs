@@ -113,7 +113,8 @@ runRiderApp' appCfg = do
                 { esqDBCfg = appCfg.esqDBCfg,
                   esqDBReplicaCfg = appCfg.esqDBReplicaCfg,
                   hedisClusterCfg = appCfg.hedisClusterCfg,
-                  hedisSecondaryClusterCfg = appCfg.hedisSecondaryClusterCfg
+                  hedisSecondaryClusterCfg = appCfg.hedisSecondaryClusterCfg,
+                  hedisPeerClusterCfgs = appCfg.hedisPeerClusterCfgs
                 }
             )
             appCfg.kvConfigUpdateFrequency

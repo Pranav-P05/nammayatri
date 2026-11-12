@@ -50,6 +50,7 @@ let schedulerConfig =
       , cacConfig = appCfg.cacConfig
       , inMemConfig
       , hedisSecondaryClusterCfg = appCfg.hedisSecondaryClusterCfg
+      , hedisPeerClusterCfgs = appCfg.hedisPeerClusterCfgs
       , blackListedJobs = [] : List Text
       , reclaimIntervalSec = +30
       , reclaimMinIdleMs = +600000

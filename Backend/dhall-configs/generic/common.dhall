@@ -9,6 +9,24 @@ let LogLevel = < DEBUG | INFO | WARNING | ERROR >
 
 let KafkaCompression = < NO_COMPRESSION | GZIP | SNAPPY | LZ4 >
 
+let HedisPeerCloudType = < AWS | GCP | NAMMA | UNAVAILABLE >
+
+let HedisPeerCfg =
+      { peerCloud : HedisPeerCloudType
+      , peerHedisCfg :
+          { connectHost : Text
+          , connectPort : Natural
+          , connectAuth : Optional Text
+          , connectDatabase : Integer
+          , connectMaxConnections : Integer
+          , connectMaxIdleTime : Integer
+          , connectTimeout : Optional Integer
+          , connectReadOnly : Bool
+          }
+      }
+
+let noHedisPeerClusterCfgs = [] : List HedisPeerCfg
+
 let S3AwsConfig =
       { accessKeyId : Text
       , secretAccessKey : Text
@@ -135,6 +153,9 @@ in  { smsSessionConfig
     , periodType = PeriodType
     , consumerType = ConsumerType
     , kafkaCompression = KafkaCompression
+    , HedisPeerCfg
+    , HedisPeerCloudType
+    , noHedisPeerClusterCfgs
     , kafkaConfig
     , streamConfig
     , eventStreamNameType

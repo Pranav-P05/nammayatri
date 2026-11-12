@@ -631,6 +631,7 @@ in  { esqDBCfg
     , hedisCfg = rcfg
     , hedisClusterCfg = rccfg
     , hedisSecondaryClusterCfg = rccfgSecondary
+    , hedisPeerClusterCfgs = common.noHedisPeerClusterCfgs
     , ltsRedisCfg = ltsrcfg
     , secondaryLTSRedisCfg = Some ltsrcfg
     , ltsReplicaRedisCfg = Some ltsrcfg

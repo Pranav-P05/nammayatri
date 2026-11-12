@@ -532,6 +532,7 @@ in  { esqDBCfg
     , hedisCfg = hcfg
     , hedisClusterCfg = hccfg
     , hedisSecondaryClusterCfg = hccfgSecondary
+    , hedisPeerClusterCfgs = common.noHedisPeerClusterCfgs
     , hedisNonCriticalCfg = hcfg
     , hedisNonCriticalClusterCfg = hccfg
     , hedisMigrationStage = False

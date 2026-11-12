@@ -35,7 +35,7 @@ import Kernel.Prelude
 import Kernel.Sms.Config (SmsConfig)
 import Kernel.Storage.Clickhouse.Config
 import Kernel.Storage.Esqueleto.Config
-import Kernel.Storage.Hedis (HedisEnv, connectHedis, connectHedisCluster, disconnectHedis)
+import Kernel.Storage.Hedis (HedisEnv, connectHedis, connectHedisCluster, connectSecondaryAndPeerHedisClusters, disconnectHedis)
 import qualified Kernel.Storage.InMem as IM
 import Kernel.Streaming.Kafka.Commons
 import Kernel.Streaming.Kafka.Producer.Types
@@ -93,6 +93,7 @@ data HandlerEnv = HandlerEnv
     hedisNonCriticalClusterEnv :: HedisEnv,
     hedisClusterEnv :: HedisEnv,
     secondaryHedisClusterEnv :: Maybe HedisEnv,
+    additionalHedisClusterEnvs :: [HedisEnv],
     cutOffHedisCluster :: Bool,
     hedisMigrationStage :: Bool,
     cacheConfig :: CacheConfig,
@@ -214,12 +215,7 @@ buildHandlerEnv HandlerCfg {..} = do
     if cutOffHedisCluster
       then pure hedisNonCriticalEnv
       else connectHedisCluster hedisNonCriticalClusterCfg ("doa:n_c:" <>)
-  secondaryHedisClusterEnv <-
-    Kernel.Prelude.try (connectHedisCluster appCfg.hedisSecondaryClusterCfg ("dynamic-offer-driver-app:" <>)) >>= \case
-      Left (e :: SomeException) -> do
-        putStrLn $ "ERROR: Failed to connect to secondary hedis cluster: " ++ show e
-        pure Nothing
-      Right env -> pure (Just env)
+  (secondaryHedisClusterEnv, additionalHedisClusterEnvs) <- connectSecondaryAndPeerHedisClusters appCfg.hedisSecondaryClusterCfg appCfg.hedisPeerClusterCfgs ("dynamic-offer-driver-app:" <>)
   let jobInfoMap :: (M.Map Text Bool) = M.mapKeys show jobInfoMapx
   let jobRetryOnExceptionMap :: (M.Map Text Bool) = M.mapKeys show jobRetryOnExceptionMapx
   ssrMetrics <- registerSendSearchRequestToDriverMetricsContainer
@@ -248,6 +244,7 @@ releaseHandlerEnv HandlerEnv {..} = do
   maybe (pure ()) disconnectHedis ltsReplicaHedisEnv
   disconnectHedis hedisClusterEnv
   maybe (pure ()) disconnectHedis secondaryHedisClusterEnv
+  mapM_ disconnectHedis additionalHedisClusterEnvs
 
 type Flow = FlowR HandlerEnv
 

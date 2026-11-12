@@ -25,7 +25,7 @@ import Kernel.Prelude hiding (mask, throwIO)
 import Kernel.Randomizer
 import Kernel.Storage.Beam.SystemConfigs
 import Kernel.Storage.Esqueleto.Config (prepareEsqDBEnv)
-import Kernel.Storage.Hedis (connectHedis, connectHedisCluster)
+import Kernel.Storage.Hedis (connectHedis, connectHedisCluster, connectSecondaryAndPeerHedisClusters)
 import qualified Kernel.Storage.Hedis as Hedis
 import qualified Kernel.Storage.InMem as IM
 import Kernel.Streaming.Kafka.Producer.Types
@@ -90,12 +90,7 @@ runSchedulerServiceWith waiMiddleware s@SchedulerConfig {..} jobInfoMap jobRetry
     if cutOffHedisCluster
       then pure hedisEnv
       else connectHedisCluster hedisClusterCfg (\k -> hedisPrefix <> ":" <> k)
-  secondaryHedisClusterEnv <-
-    Kernel.Prelude.try (connectHedisCluster hedisSecondaryClusterCfg (\k -> hedisPrefix <> ":" <> k)) >>= \case
-      Left (e :: Kernel.Prelude.SomeException) -> do
-        putStrLn $ "ERROR: Failed to connect to secondary hedis cluster: " ++ show e
-        pure Nothing
-      Right env -> pure (Just env)
+  (secondaryHedisClusterEnv, additionalHedisClusterEnvs) <- connectSecondaryAndPeerHedisClusters hedisSecondaryClusterCfg hedisPeerClusterCfgs (\k -> hedisPrefix <> ":" <> k)
   metrics <- setupSchedulerMetrics
   isShuttingDown <- mkShutdown
   consumerId <- G.generateGUIDTextIO
